@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaBars, FaTimes, FaUser, FaSignOutAlt } from "react-icons/fa";
-import logo from "../../assets/logocar.png";
+import logo from "../../assets/logocar1.png";
 import { navbarStyles as styles } from "../../assets/dummyStyles";
 import axios from "axios";
 
@@ -217,16 +217,16 @@ const Navbar = () => {
             role="region"
             aria-roledescription="navigation"
           >
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center">
                 <div className={styles.logoContainer}>
                   <img
                     src={logo}
                     alt="Karzone logo"
-                    className="h-[1em] w-auto block"
-                    style={{ display: "block", objectFit: "contain" }}
+                    className="h-8 md:h-10 lg:h-14 w-auto block object-contain"
                   />
-                  <span className={styles.logoText}>THE BAZAAR</span>
+
+                  {/* <span className={styles.logoText}>THE BAZAAR</span> */}
                 </div>
               </Link>
 

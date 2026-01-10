@@ -37,15 +37,30 @@ const Footer = () => {
                         </p>
 
                         <div className={styles.socialIcons}>
-                            {
-                                [FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn, FaYoutube].map(
-                                    (Icon, i) => (
-                                        <a href="#" key={i} className={styles.socialIcon}>
-                                            <Icon />
-                                        </a>
-                                    )
-                                )
-                            }
+                            {[
+                                {
+                                    Icon: FaInstagram,
+                                    link: "https://www.instagram.com/aurumdrive_logistics?igsh=MXZ4bjFmNHdha24yMQ==",
+                                },
+                                {
+                                    Icon: FaFacebookF,
+                                    link: "https://www.facebook.com/share/1Gfeua38TX/",
+                                },
+                                {
+                                    Icon: FaLinkedinIn,
+                                    link: "https://www.linkedin.com/company/aurumdrive-logistics/",
+                                },
+                            ].map(({ Icon, link }, i) => (
+                                <a
+                                    href={link}
+                                    key={i}
+                                    className={styles.socialIcon}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <Icon />
+                                </a>
+                            ))}
                         </div>
                     </div>
 
@@ -89,11 +104,11 @@ const Footer = () => {
                             </li>
                             <li className={styles.contactItem}>
                                 <FaPhone className={styles.contactIcon} />
-                                <span>+254 790 179029</span>
+                                <span>+254 798 615674 </span>
                             </li>
                             <li className={styles.contactItem}>
                                 <FaEnvelope className={styles.contactIcon} />
-                                <span>info@thebazaar.com</span>
+                                <span>aurumdrivelogistics@gmail.com</span>
                             </li>
                         </ul>
 

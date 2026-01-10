@@ -32,64 +32,44 @@ const carSummarySchema = new Schema(
   { _id: false }
 );
 
-/* -------------------- Booking Schema -------------------- */
-
 const bookingSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-
     customer: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true },
     phone: { type: String, default: "" },
-
     car: { type: carSummarySchema, required: true },
     carImage: { type: String, default: "" },
-
     pickupDate: { type: Date, required: true },
     returnDate: { type: Date, required: true },
-
     bookingDate: { type: Date, default: Date.now },
-
     status: {
       type: String,
       enum: ["pending", "active", "completed", "cancelled", "upcoming"],
       default: "pending",
     },
-
     amount: { type: Number, default: 0 },
-
-    paymentStatus: {
-      type: String,
-      enum: ["pending", "paid"],
-      default: "pending",
-    },
-
-    paymentMethod: {
-      type: String,
-      enum: ["Credit Card", "Paypal"],
-      default: "Credit Card",
-    },
-
-    /* Stripe safety */
-    sessionId: { type: String, index: true, unique: true, sparse: true },
-    paymentIntentId: { type: String, index: true, unique: true, sparse: true },
-    stripeSession: { type: Schema.Types.Mixed, default: {} },
-
+    paymentStatus: { type: String, enum: ["pending", "paid"], default: "pending" },
+    paymentMethod: { type: String, enum: ["Credit Card", "Paypal"], default: "Credit Card" },
+    sessionId: String,
+    paymentIntentId: String,
     address: { type: addressSchema, default: () => ({}) },
+    stripeSession: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );
 
-/* -------------------- Indexes -------------------- */
 
-// Fast conflict lookups
-bookingSchema.index({ "car.id": 1, pickupDate: 1, returnDate: 1 });
+// /* -------------------- Indexes -------------------- */
 
-// Stripe idempotency
-bookingSchema.index({ sessionId: 1 }, { unique: true, sparse: true });
-bookingSchema.index({ paymentIntentId: 1 }, { unique: true, sparse: true });
+// // Fast conflict lookups
+// bookingSchema.index({ "car.id": 1, pickupDate: 1, returnDate: 1 });
 
-/* -------------------- Constants -------------------- */
+// // Stripe idempotency
+// bookingSchema.index({ sessionId: 1 }, { unique: true, sparse: true });
+// bookingSchema.index({ paymentIntentId: 1 }, { unique: true, sparse: true });
+
+// /* -------------------- Constants -------------------- */
 
 const BLOCKING_STATUSES = ["pending", "active", "upcoming"];
 
@@ -99,8 +79,8 @@ function datesOverlap(startA, endA, startB, endB) {
   return startA < endB && endA > startB;
 }
 
-/* -------------------- Pre Validate -------------------- */
-/* Populate car snapshot */
+// /* -------------------- Pre Validate -------------------- */
+// /* Populate car snapshot */
 
 bookingSchema.pre("validate", async function () {
   if (!this.car?.id) return;
