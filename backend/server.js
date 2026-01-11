@@ -1,9 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import path from "path";
 import helmet from "helmet";
-import { fileURLToPath } from "url";
 
 import { connectDB } from "./config/db.js";
 import userRouter from "./routes/userRoutes.js";
@@ -15,16 +13,16 @@ dotenv.config();
 
 const app = express();
 
-/* -------------------- dirname fix -------------------- */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-/* -------------------- DB (SAFE) -------------------- */
-try {
-  await connectDB();
-} catch (err) {
-  console.error("Database connection failed:", err);
-}
+/* -------------------- DB INIT -------------------- */
+const initDB = async () => {
+  try {
+    await connectDB();
+    console.log("DB connected");
+  } catch (err) {
+    console.error("DB error:", err.message);
+  }
+};
+initDB();
 
 /* -------------------- CORS -------------------- */
 const allowedOrigins = [
@@ -34,36 +32,20 @@ const allowedOrigins = [
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, false); // never throw on Vercel
-      }
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+      else cb(null, false);
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 app.options("*", cors());
 
 /* -------------------- Middleware -------------------- */
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
-);
-
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-/* ⚠️ uploads NOTE:
-   Vercel filesystem is read-only.
-   Use Cloudinary / S3 for production.
-*/
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* -------------------- Routes -------------------- */
 app.use("/api/auth", userRouter);
@@ -72,12 +54,12 @@ app.use("/api/bookings", bookingRouter);
 app.use("/api/payments", paymentRouter);
 
 app.get("/api/ping", (req, res) => {
-  res.json({ ok: true, time: Date.now() });
+  res.json({ ok: true });
 });
 
 app.get("/", (req, res) => {
   res.send("API WORKING");
 });
 
-/* 🚀 REQUIRED FOR VERCEL */
+/* 🚀 EXPORT ONLY */
 export default app;
