@@ -33,7 +33,8 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const base = "http://localhost:5000";
+      // const base = "http://localhost:5000";
+      const base = "https://api-two-navy.vercel.app";
       const url = `${base}/api/auth/login`;
 
       const res = await axios.post(url, credentials, {

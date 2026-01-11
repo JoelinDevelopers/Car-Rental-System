@@ -29,7 +29,8 @@ const Cars = () => {
   const [error, setError] = useState("");
 
   const abortControllerRef = useRef(null);
-  const base = "http://localhost:5000";
+  // const base = "http://localhost:5000";
+  const base = "https://api-two-navy.vercel.app";
   const limit = 12;
   const fallbackImage = `${base}/uploads/default-car.png`;
 
