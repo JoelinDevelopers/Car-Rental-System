@@ -1,28 +1,15 @@
-import multer from "multer";
-import path from 'path';
-import fs from 'fs';
+import multer from 'multer';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import cloudinary from '../cloudinary.js';
 
-const uploadDir = path.join(process.cwd(), 'uploads');
-if(!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir)
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        const base = path.basename(file.originalname, ext).replace(/\s+/g, '-');
-        cb(null, `${base}-${Date.now()}${ext}`) 
-    }
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'car-rentals',
+    allowed_formats: ['jpg', 'png', 'jpeg'],
+  },
 });
 
-const fileFilter = (req, file, cb) => {
-    if(file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Only images file are allowed'), false);
-};
+const upload = multer({ storage });
 
-export const uploads = multer({
-    storage,
-    limits: {filesize: 5 * 1024 * 1024},
-    fileFilter
-});
+export default upload;
