@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   FaUserFriends,
@@ -21,9 +21,10 @@ import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import carsData from "../../assets/carsData";
 import { carDetailStyles } from "../../assets/dummyStyles";
+import { AddCarPageStyles } from "../../../../admin/src/assets/dummyStyles";
 
-// const API_BASE = "http://localhost:5000";
-const API_BASE = "https://api-two-navy.vercel.app";
+const API_BASE = "http://localhost:5000";
+// const API_BASE = "https://api-two-navy.vercel.app";
 const api = axios.create({
   baseURL: API_BASE,
   headers: { Accept: "application/json" },
@@ -86,12 +87,33 @@ const CarDetail = () => {
     city: "",
     state: "",
     zipCode: "",
+    idPassportImage: null,
+  idPassportPreview: null,
+  drivingLicenseImage: null,
+  drivingLicensePreview: null,
   });
   const [activeField, setActiveField] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const fetchControllerRef = useRef(null);
   const submitControllerRef = useRef(null);
   const [today, setToday] = useState(todayISO());
+  const fileRef = useRef(null);
+  const handleImageChange = (e, type) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    setFormData((prev) => ({
+      ...prev,
+      [`${type}Image`]: file,
+      [`${type}Preview`]: evt.target.result,
+    }));
+  };
+  reader.readAsDataURL(file);
+};
+
+
 
   useEffect(() => setToday(todayISO()), []);
 
@@ -617,7 +639,7 @@ const CarDetail = () => {
                       <input
                         type="text"
                         name="state"
-                        placeholder="Your state"
+                        placeholder="Your State"
                         value={formData.state}
                         onChange={handleInputChange}
                         onFocus={() => setActiveField("state")}
@@ -654,6 +676,114 @@ const CarDetail = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* ADDED */}
+               {/* ADDED IMAGE UPLOAD */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* ID/Passport */}
+                  <div className="flex flex-col">
+                    <label className={AddCarPageStyles.label}>ID/Passport</label>
+                    <div className={AddCarPageStyles.imageUploadContainer}>
+                      <label className={AddCarPageStyles.imageUploadLabel}>
+                        {formData.idPassportPreview ? (
+                          <div className="w-full h-full rounded-xl overflow-hidden">
+                            <img
+                              src={formData.idPassportPreview}
+                              alt="ID Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className={AddCarPageStyles.imageUploadPlaceholder}>
+                            <svg
+                              className={AddCarPageStyles.iconUpload}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <p className={AddCarPageStyles.imageUploadText}>
+                              <span className={AddCarPageStyles.imageUploadTextSemibold}>
+                                Click to upload
+                              </span>
+                              <br />
+                              or drag and drop
+                            </p>
+                            <p className={AddCarPageStyles.imageUploadSubText}>
+                              PNG, JPG upto 5mbs
+                            </p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          name="idPassport"
+                          onChange={(e) => handleImageChange(e, "idPassport")}
+                          className="hidden"
+                          accept="image/*"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Driving License */}
+                  <div className="flex flex-col">
+                    <label className={AddCarPageStyles.label}>Driving License</label>
+                    <div className={AddCarPageStyles.imageUploadContainer}>
+                      <label className={AddCarPageStyles.imageUploadLabel}>
+                        {formData.drivingLicensePreview ? (
+                          <div className="w-full h-full rounded-xl overflow-hidden">
+                            <img
+                              src={formData.drivingLicensePreview}
+                              alt="License Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className={AddCarPageStyles.imageUploadPlaceholder}>
+                            <svg
+                              className={AddCarPageStyles.iconUpload}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <p className={AddCarPageStyles.imageUploadText}>
+                              <span className={AddCarPageStyles.imageUploadTextSemibold}>
+                                Click to upload
+                              </span>
+                              <br />
+                              or drag and drop
+                            </p>
+                            <p className={AddCarPageStyles.imageUploadSubText}>
+                              PNG, JPG upto 5mbs
+                            </p>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          name="drivingLicense"
+                          onChange={(e) => handleImageChange(e, "drivingLicense")}
+                          className="hidden"
+                          accept="image/*"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+
 
                 <div className={carDetailStyles.priceBreakdown}>
                   <div className={carDetailStyles.priceRow}>

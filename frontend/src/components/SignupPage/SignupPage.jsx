@@ -40,8 +40,8 @@ const SignUp = () => {
     setLoading(true);
 
     try {
-      // const base = "http://localhost:5000";
-      const base = "https://api-two-navy.vercel.app";
+      const base = "http://localhost:5000";
+      // const base = "https://api-two-navy.vercel.app";
       const url = `${base}/api/auth/register`;
 
       const res = await axios.post(url, formData, {

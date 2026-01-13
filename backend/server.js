@@ -1,65 +1,61 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import helmet from "helmet";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
-import { connectDB } from "./config/db.js";
-import userRouter from "./routes/userRoutes.js";
-import carRouter from "./routes/carRoutes.js";
-import bookingRouter from "./routes/bookingRoutes.js";
-import paymentRouter from "./routes/paymentRoutes.js";
+import path from 'path';
+import helmet from 'helmet';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+import { connectDB } from './config/db.js';
+import userRouter from './routes/userRoutes.js';
+import carRouter from './routes/carRoutes.js';
+import bookingRouter from './routes/bookingRoutes.js';
+import paymentRouter from './routes/paymentRoutes.js';
 
 const app = express();
+const PORT = 5000;
+dotenv.config();
 
-/* -------------------- DB INIT -------------------- */
-const initDB = async () => {
-  try {
-    await connectDB();
-    console.log("DB connected");
-  } catch (err) {
-    console.error("DB error:", err.message);
-  }
-};
-initDB();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-/* -------------------- CORS -------------------- */
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://car-rental-system-374x.vercel.app",
-];
+connectDB();
+// MIDDLEWARES
+app.use(cors())
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin'},
+  })
+)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }))
 
 app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) cb(null, true);
-      else cb(null, false);
-    },
-    credentials: true,
-  })
-);
+  '/uploads', (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', "*");
+    next();
+  },
+  express.static(path.join(process.cwd(), 'uploads'))
+)
 
-app.options("*", cors());
 
-/* -------------------- Middleware -------------------- */
-app.use(helmet());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ROUTES
+app.use('/api/auth', userRouter);
+app.use('/api/cars', carRouter);
+app.use('/api/bookings', bookingRouter);
+app.use('/api/payments', paymentRouter);
 
-/* -------------------- Routes -------------------- */
-app.use("/api/auth", userRouter);
-app.use("/api/cars", carRouter);
-app.use("/api/bookings", bookingRouter);
-app.use("/api/payments", paymentRouter);
+app.get('/api/ping', (req, res) => res.json({
+  ok: true,
+  time: Date.now()
+}))
 
-app.get("/api/ping", (req, res) => {
-  res.json({ ok: true });
+
+// LISTEN
+app.get('/', (req, res) => {
+  res.send('API WORKING')
 });
 
-app.get("/", (req, res) => {
-  res.send("API WORKING");
-});
-
-/* 🚀 EXPORT ONLY */
-export default app;
+app.listen(PORT, () => {
+  console.log(`Server Started on http://localhost:${PORT}`)
+})
