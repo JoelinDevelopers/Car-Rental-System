@@ -3,7 +3,8 @@ import { AddCarPageStyles, toastStyles } from '../../assets/dummyStyles';
 import axios from 'axios';
 import { toast, ToastContainer } from "react-toastify";
 
-const baseURL = 'http://localhost:5000';
+// const baseURL = 'http://localhost:5000';
+const baseURL = 'https://aurumdrive-backend-gamma.vercel.app';
 const api = axios.create({baseURL});
 
 const AddCarPage = () => {

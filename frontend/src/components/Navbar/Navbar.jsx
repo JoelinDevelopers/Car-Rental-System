@@ -28,8 +28,8 @@ const Navbar = () => {
   const buttonRef = useRef(null);
   const abortRef = useRef(null);
 
-  const base = "http://localhost:5000";
-  // const base = "https://api-two-navy.vercel.app";
+  // const base = "http://localhost:5000";
+  const base = "https://aurumdrive-backend-gamma.vercel.app";
   const api = axios.create({
     baseURL: base,
     headers: { Accept: "application/json" },

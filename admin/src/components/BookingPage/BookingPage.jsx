@@ -3,7 +3,8 @@ import { BookingPageStyles, statusConfig } from '../../assets/dummyStyles';
 import axios from "axios";
 import { FaCalendarAlt, FaCar, FaCheckCircle, FaChevronDown, FaCity, FaCreditCard, FaEdit, FaEnvelope, FaFilter, FaGasPump, FaGlobeAsia, FaMapMarkerAlt, FaMapPin, FaPhone, FaSearch, FaSync, FaTachometerAlt, FaUser, FaUserFriends } from 'react-icons/fa';
 
-const baseURL = "http://localhost:5000";
+// const baseURL = "http://localhost:5000";
+const baseURL = "https://aurumdrive-backend-gamma.vercel.app";
 const api = axios.create({ baseURL, headers: {Accept: 'application/json'}});
 
 // Utility functions

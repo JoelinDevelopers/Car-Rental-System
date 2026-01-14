@@ -23,8 +23,8 @@ import carsData from "../../assets/carsData";
 import { carDetailStyles } from "../../assets/dummyStyles";
 import { AddCarPageStyles } from "../../../../admin/src/assets/dummyStyles";
 
-const API_BASE = "http://localhost:5000";
-// const API_BASE = "https://api-two-navy.vercel.app";
+// const API_BASE = "http://localhost:5000";
+const API_BASE = "https://aurumdrive-backend-gamma.vercel.app";
 const api = axios.create({
   baseURL: API_BASE,
   headers: { Accept: "application/json" },

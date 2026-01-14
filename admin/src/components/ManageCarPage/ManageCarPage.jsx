@@ -6,7 +6,8 @@ import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify'
 
 
-const BASE = 'http://localhost:5000';
+// const BASE = 'http://localhost:5000';
+const BASE = 'https://aurumdrive-backend-gamma.vercel.app';
 const api = axios.create({
   baseURL: BASE,
   headers: {Accept: 'application/json'}
