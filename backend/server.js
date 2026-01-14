@@ -31,15 +31,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 📁 Static uploads
-app.use(
-  '/uploads',
-  (req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    next();
-  },
-  express.static(path.join(__dirname, 'uploads'))
-);
 
 // 🚏 Routes
 app.use('/api/auth', userRouter);
