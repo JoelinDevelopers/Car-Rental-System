@@ -1,6 +1,6 @@
 import React from 'react';
 import { footerStyles as styles } from '../../assets/dummyStyles';
-import logo from "../../assets/logocar.png";
+import logo from "../../assets/logocar1.png";
 import { Link } from 'react-router-dom';
 import { FaEnvelope, FaFacebookF, FaInstagram, FaLinkedinIn, FaMapMarkedAlt, FaPhone, FaTwitter, FaYoutube } from 'react-icons/fa';
 import { GiCarKey } from 'react-icons/gi';
@@ -28,7 +28,7 @@ const Footer = () => {
                                         objectFit: "contain"
                                     }}
                                 />
-                                <span className={styles.logoText}>THE BAZAAR</span>
+                                <span className={styles.logoText}>AURUMDRIVE</span>
                             </div>
                         </Link>
                         <p className={styles.description}>
@@ -149,7 +149,7 @@ const Footer = () => {
 
                 {/* BOTTOM COPYRIGHT */}
                 <div className={styles.copyright}>
-                    <p>&copy; {new Date().getFullYear()} THE BAZAAR. All rights reserved.</p>
+                    <p>&copy; {new Date().getFullYear()} AURUMDRIVE. All rights reserved.</p>
 
                     <p className="mt-3 md:mt-0">
                         Designed by{" "} 

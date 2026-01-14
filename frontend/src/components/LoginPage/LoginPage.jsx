@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { loginStyles } from '../../assets/dummyStyles';
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FaArrowLeft, FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
-import logo from "../../assets/logocar.png"
+import logo from "../../assets/logocar1.png";
 import { toast, ToastContainer } from 'react-toastify';
 import axios from 'axios';
 
@@ -129,11 +129,11 @@ const Login = () => {
                     objectFit: "contain"
                   }}
                 />
-                <span className="font-bold tracking-wider">BAZAAR</span>
+                <span className="font-bold tracking-wider">AURUMDRIVE</span>
               </div>
             </div>
 
-            <h1 className={loginStyles.loginCard.title}>The Bazaar</h1>
+            <h1 className={loginStyles.loginCard.title}>AURUMDRIVE</h1>
             <p className={loginStyles.loginCard.subtitle}>
               LUXURY MOBILITY EXPERIENCE
             </p>

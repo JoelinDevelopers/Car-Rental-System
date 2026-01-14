@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { signupStyles } from '../../assets/dummyStyles';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaCheck, FaEnvelope, FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa';
-import logo from "../../assets/logocar.png"
+import logo from "../../assets/logocar1.png";
 import { toast, ToastContainer } from 'react-toastify'
 import axios from "axios";
 
@@ -165,11 +165,11 @@ const SignUp = () => {
                     display: "block",
                   }}
                 />
-                <span className="font-bold tracking-wide text-white mt-1">BAZAAR</span>
+                <span className="font-bold tracking-wide text-white mt-1">AURUMDRIVE</span>
               </div>
             </div>
 
-            <h1 className={signupStyles.signupCard.title}>Join The Bazaar</h1>
+            <h1 className={signupStyles.signupCard.title}>Join AURUMDRIVE</h1>
             <p className={signupStyles.signupCard.subtitle}>
               Create your account
             </p>
