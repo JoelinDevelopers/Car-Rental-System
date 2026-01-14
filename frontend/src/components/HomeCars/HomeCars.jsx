@@ -31,6 +31,9 @@ const HomeCars = () => {
   });
   const limit = 6;
   const fallbackImage = `${base}/uploads/default-car.png`;
+  
+  // Reliable SVG fallback that always works (no external dependency)
+  const ultimateFallback = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250'%3E%3Crect width='400' height='250' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui, sans-serif' font-size='18' fill='%23999'%3ENo Image Available%3C/text%3E%3C/svg%3E";
 
   useEffect(() => {
     const t = setTimeout(() => setAnimateCards(true), 300);
@@ -88,12 +91,23 @@ const HomeCars = () => {
   const handleImageError = (e) => {
     const img = e?.target;
     if (!img) return;
-    img.onerror = null;
-    img.src = fallbackImage;
-    img.onerror = () => {
-      img.onerror = null;
-      img.src = "https://via.placeholder.com/400x250.png?text=No+Image";
-    };
+    
+    // Prevent infinite error loops
+    if (img.src === ultimateFallback) return;
+    
+    img.onerror = null; // Remove handler to prevent recursion
+    
+    // Try local fallback first, then ultimate SVG fallback
+    if (img.src !== fallbackImage) {
+      img.src = fallbackImage;
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = ultimateFallback;
+      };
+    } else {
+      img.src = ultimateFallback;
+    }
+    
     img.alt = img.alt || "Image not available";
     img.style.objectFit = img.style.objectFit || "cover";
   };

@@ -28,9 +28,13 @@ const carSchema = new Schema({
   dailyRate: { type: Number, required: true },
   status: { type: String, enum: ['available','rented','maintenance'], default: 'available' },
   image: { type: String, default: '' },
+  cloudinaryId: { type: String, default: '' }, // ⭐ NEW - For Cloudinary deletion
+  description: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
 
   bookings: { type: [carBookingSubSchema], default: [] },
+}, {
+  timestamps: true
 });
 
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {

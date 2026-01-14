@@ -1,25 +1,20 @@
-import express from "express";
-import {
-  createCar,
-  deleteCar,
-  getCarById,
-  getCars,
-  updateCar,
-} from "../controllers/carController.js";
-import upload from "../middlewares/uploads.js"; // ✅ default import
+import express from 'express';
+import { 
+  createCar, 
+  getCars, 
+  getCarById, 
+  updateCar, 
+  deleteCar 
+} from '../controllers/carController.js';
+import { upload } from '../config/cloudinary.js';
 
-const carRouter = express.Router();
+const router = express.Router();
 
-carRouter.get("/", getCars);
-carRouter.get("/:id", getCarById);
+// Routes with Cloudinary upload middleware
+router.post('/', upload.single('image'), createCar);
+router.get('/', getCars);
+router.get('/:id', getCarById);
+router.put('/:id', upload.single('image'), updateCar);
+router.delete('/:id', deleteCar);
 
-// Create car (image upload)
-carRouter.post("/", upload.single("image"), createCar);
-
-// Update car (image upload)
-carRouter.put("/:id", upload.single("image"), updateCar);
-
-// Delete car
-carRouter.delete("/:id", deleteCar);
-
-export default carRouter;
+export default router;
