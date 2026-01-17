@@ -3,7 +3,8 @@ import Booking from "../models/bookingModel.js";
 import Car from "../models/carModel.js";
 import path from 'path';
 import fs from 'fs';
-import bookingModel from "../models/bookingModel.js";
+import { sendAdminBookingEmail, sendCustomerBookingEmail } from "../config/email.js";
+import { sendWhatsAppTwilio } from "../config/whatsapp.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const BLOCKING_STATUSES = ["pending", "active", "upcoming"];
@@ -41,39 +42,90 @@ const deleteLocalFileIfPresent = (filePath) => {
   fs.unlink(full, (err) => { if (err) console.warn('Failed to delete file:', full, err)});
 };
 
-//CREATE BOOKING
-export const createBooking = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
+// HELPER: Send notifications in background (non-blocking)
+const sendBookingNotifications = async (booking) => {
   try {
+    const message = `
+🚗 NEW BOOKING
+
+Customer: ${booking.customer}
+Car: ${booking.car.make} ${booking.car.model}
+Pickup: ${booking.pickupDate.toDateString()}
+Return: ${booking.returnDate.toDateString()}
+Amount: Kes ${booking.amount}
+Status: ${booking.status}
+    `.trim();
+
+    // Send all notifications (don't await - let them run in background)
+    Promise.all([
+      sendWhatsAppTwilio({
+        to: process.env.ADMIN_WHATSAPP,
+        message
+      }).catch(err => console.error('WhatsApp notification failed:', err.message)),
+      
+      sendCustomerBookingEmail(booking)
+        .catch(err => console.error('Customer email failed:', err.message)),
+      
+      sendAdminBookingEmail(booking)
+        .catch(err => console.error('Admin email failed:', err.message))
+    ])
+    .then(() => console.log('✅ All notifications sent successfully'))
+    .catch(err => console.error('⚠️ Some notifications failed:', err.message));
+
+  } catch (err) {
+    console.error('❌ Notification error:', err.message);
+  }
+};
+
+// HELPER: Execute booking creation with retry logic
+const executeBookingCreation = async (req, retryCount = 0) => {
+  const maxRetries = 3;
+  const session = await mongoose.startSession();
+  
+  try {
+    session.startTransaction();
+
     let { customer, email, phone, car, pickupDate, returnDate, amount, details, address, carImage } = req.body;
 
     if (!customer || !email || !car || !pickupDate || !returnDate) {
-      await session.abortTransaction(); session.endSession();
-      return res.status(400).json({ success: false, message: 'Missing required fields'})
+      await session.abortTransaction();
+      session.endSession();
+      throw new Error('Missing required fields');
     }
 
     const pickup = new Date(pickupDate);
     const ret = new Date(returnDate);
 
     if (Number.isNaN(pickup.getTime()) || Number.isNaN(ret.getTime()) || pickup > ret) {
-      await session.abortTransaction(); session.endSession();
-      return res.status(400).json({ success: false, message: 'Invalid pickup and return date'})
+      await session.abortTransaction();
+      session.endSession();
+      throw new Error('Invalid pickup and return date');
     }
 
-    // Resolve car summary (accepts ObjectId string, object, or stringified JSON)
+    // Resolve car summary
     let carSummary = null;
     if (typeof car === "string" && /^[0-9a-fA-F]{24}$/.test(car)) {
       const carDoc = await Car.findById(car).session(session).lean();
-      if (!carDoc) { await session.abortTransaction(); session.endSession(); return res.status(404).json({ success: false, message: "Car not found" }); }
+      if (!carDoc) {
+        await session.abortTransaction();
+        session.endSession();
+        throw new Error("Car not found");
+      }
       carSummary = buildCarSummary(carDoc);
     } else {
       const parsed = tryParseJSON(car) || car;
       carSummary = buildCarSummary(parsed);
-      if (!carSummary.id) { await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: "Invalid car payload" }); }
+      if (!carSummary.id) {
+        await session.abortTransaction();
+        session.endSession();
+        throw new Error("Invalid car payload");
+      }
       const carExists = await Car.exists({ _id: carSummary.id }).session(session);
-      if (!carExists) { await session.abortTransaction(); session.endSession(); return res.status(404).json({ success: false, message: "Car not found" }); }
+      if (!carExists) {
+        await session.abortTransaction();
+        session.endSession();
+        throw new Error("Car not found");
+      }
     }
 
     const carId = carSummary.id;
@@ -85,8 +137,9 @@ export const createBooking = async (req, res) => {
     }).session(session);
 
     if (overlappingCount > 0) {
-      await session.abortTransaction(); session.endSession();
-      return res.status(409).json({ success: false, message: 'Car already booked'})
+      await session.abortTransaction();
+      session.endSession();
+      throw new Error('Car already booked for these dates');
     }
 
     const bookingData = {
@@ -105,7 +158,13 @@ export const createBooking = async (req, res) => {
 
     const createdArr = await Booking.create([bookingData], { session });
     const createdBooking = createdArr[0];
-
+    
+    await session.commitTransaction();
+    console.log('✅ Transaction committed successfully');
+    
+    session.endSession();
+    
+    // Update car bookings OUTSIDE of transaction to avoid write conflicts
     const bookingEntry = {
       bookingid: createdBooking._id,
       pickupDate: createdBooking.pickupDate,
@@ -113,19 +172,62 @@ export const createBooking = async (req, res) => {
       status: createdBooking.status,
     };
 
-    await Car.findByIdAndUpdate(carId, { $push: { bookings: bookingEntry } }, { session });
-    await session.commitTransaction();
+    // This runs outside transaction, so it won't cause conflicts
+    await Car.findByIdAndUpdate(
+      carId, 
+      { $push: { bookings: bookingEntry } }
+    ).catch(err => {
+      console.error('Warning: Failed to update car bookings array:', err.message);
+      // Don't fail the whole booking if this fails
+    });
+    
+    const saved = await Booking.findById(createdBooking._id);
+    return saved;
+
+  } catch (err) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
     session.endSession();
-    const saved = await Booking.findById(createdBooking._id).lean();
-    return res.status(201).json({
+    
+    // Retry on write conflict
+    if (err.code === 112 && retryCount < maxRetries) {
+      console.log(`⚠️ Write conflict detected, retrying... (attempt ${retryCount + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1))); // Exponential backoff
+      return executeBookingCreation(req, retryCount + 1);
+    }
+    
+    throw err;
+  }
+};
+
+//CREATE BOOKING
+export const createBooking = async (req, res) => {
+  try {
+    const saved = await executeBookingCreation(req);
+
+    // ✅ RESPOND TO FRONTEND IMMEDIATELY (before notifications)
+    res.status(201).json({
       success: true,
       booking: saved
     });
+
+    // 🔔 SEND NOTIFICATIONS IN BACKGROUND (non-blocking)
+    setImmediate(() => {
+      sendBookingNotifications(saved);
+    });
+
   } catch (err) {
-    await session.abortTransaction().catch(() => { });
-    session.endSession();
-    console.error('Create Booking Error:', err);
-    return res.status(500).json({
+    console.error('❌ Create Booking Error:', err);
+    
+    const statusCode = 
+      err.message.includes('Missing required fields') ? 400 :
+      err.message.includes('Invalid') ? 400 :
+      err.message.includes('not found') ? 404 :
+      err.message.includes('already booked') ? 409 :
+      500;
+    
+    return res.status(statusCode).json({
       success: false,
       message: err.message
     });
@@ -192,7 +294,6 @@ export const getMyBookings = async (req, res, next) => {
       next(err);
   }
 }
-
 
 // UPDATE FUNCTION
 export const updateBooking = async (req, res, next) => {
@@ -266,56 +367,3 @@ export const deleteBooking = async (req, res, next) => {
        next(err);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
