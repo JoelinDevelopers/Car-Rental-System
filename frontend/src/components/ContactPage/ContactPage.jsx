@@ -39,7 +39,7 @@ const Contact = () => {
       `Phone: ${formData.phone}%0A` +
       `Car Type: ${formData.carType}%0A` +
       `Message: ${formData.message}`;
-    window.open(`https://wa.me/+254790179029?text=${whatsappMessage}`, '_blank');
+    window.open(`https://wa.me/+254111260565?text=${whatsappMessage}`, '_blank');
 
     setFormData({ name: '', email: '', phone: '', carType: '', message: '' });
   };
@@ -100,8 +100,8 @@ const Contact = () => {
               <div className={styles.infoItemContainer}>
                 {
                   [
-                    { icon: FaWhatsapp, label: 'WhatsApp', value: '+254 790 17909', color: 'bg-green-900/30' },
-                    { icon: FaEnvelope, label: 'Email', value: 'info@joelindigital.com', color: 'bg-orange-900/30' },
+                    { icon: FaWhatsapp, label: 'WhatsApp', value: '+254 111 260565', color: 'bg-green-900/30' },
+                    { icon: FaEnvelope, label: 'Email', value: 'aurumdrivelogistics@gmail.com', color: 'bg-orange-900/30' },
                     { icon: FaClock, label: 'Hours', value: 'Mon-Sat: 8AM-8PM', color: 'bg-orange-900/30' },
                   ].map((info, i) => (
                     <div key={i} className={styles.infoItem}>
@@ -131,7 +131,7 @@ const Contact = () => {
                 }
               </div>
 
-              <div className={styles.offerContainer}>
+              {/* <div className={styles.offerContainer}>
                 <div className="flex items-center">
                   <FaCalendarAlt className={styles.offerIcon} />
                   <span className={styles.offerTitle}>Special Offer</span>
@@ -139,7 +139,7 @@ const Contact = () => {
                 <p className={styles.offerText}>
                   Book for 3+ days and get 10% discount
                 </p>
-              </div>
+              </div> */}
             </div>
           </div>
 

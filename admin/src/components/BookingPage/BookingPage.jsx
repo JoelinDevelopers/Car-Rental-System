@@ -38,8 +38,6 @@ const makeImageUrl = (imageRef) => {
   // Remove file extension for Cloudinary public_id
   publicId = publicId.replace(/\.[^.]+$/, '');
   
-  // If using a folder structure in Cloudinary, prepend it
-  const fullPublicId = CLOUDINARY_FOLDER ? `${CLOUDINARY_FOLDER}/${publicId}` : publicId;
   
   // Construct Cloudinary URL with transformations for optimization
   // w_800,h_600,c_limit = limit size to 800x600, maintaining aspect ratio
@@ -62,7 +60,7 @@ const makeThumbnailUrl = (imageRef) => {
   let publicId = imageRef.replace(/^upload\//, '').replace(/^\//, '');
   publicId = publicId.replace(/\.[^.]+$/, '');
   
-  const fullPublicId = CLOUDINARY_FOLDER ? `${CLOUDINARY_FOLDER}/${publicId}` : publicId;
+ 
   
   // Smaller dimensions for thumbnails, with cropping to fill
   return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/w_300,h_200,c_fill,q_auto,f_auto/${fullPublicId}`;
@@ -82,7 +80,6 @@ const makeDownloadUrl = (imageRef) => {
   let publicId = imageRef.replace(/^upload\//, '').replace(/^\//, '');
   publicId = publicId.replace(/\.[^.]+$/, '');
   
-  const fullPublicId = CLOUDINARY_FOLDER ? `${CLOUDINARY_FOLDER}/${publicId}` : publicId;
   
   // fl_attachment forces download, no transformations for original quality
   return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/fl_attachment/${fullPublicId}`;
