@@ -52,7 +52,7 @@ export const heroStyles = {
   background: "absolute lg:pt-30 pt-45 inset-0 transform-gpu will-change-transform",
   gradientOverlay: "absolute inset-0 bg-gradient-to-b from-transparent via-black/60 to-black/20",
   svgContainer: "absolute inset-0 w-full h-full pointer-events-none z-40",
-  ctaContainer: "relative z-10 pt-20 lg:pt-0 max-w-xl md:pt-110 w-[98%] sm:w-full lg:w-full mx-auto px-4",
+  ctaContainer: "relative z-10 pt-20 lg:pt-0 max-w-xl md:pt-110 w-full sm:w-full lg:w-full mx-auto px-4",
   ctaCard: "relative rounded-2xl p-6 bg-[rgba(255,255,255,0.04)] border border-white/6 backdrop-blur-md shadow-2xl flex items-center justify-between gap-4",
   subtitle: "text-xs uppercase tracking-widest text-green-300/70",
   title: "text-white md:text-sm text-lg sm:text-2xl font-semibold mt-1",

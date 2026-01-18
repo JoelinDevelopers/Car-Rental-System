@@ -6,7 +6,8 @@ import { sendWhatsAppTwilio } from "../config/whatsapp.js";
 
 dotenv.config();
 
-const CLIENT_URL = 'http://localhost:5173';
+// const CLIENT_URL = 'http://localhost:5173';
+const CLIENT_URL = 'https://aurumdriverentals.com'
 const STRIPE_API_VERSION = "2022-11-15";
 
 //GET STRIPE FROM .ENV

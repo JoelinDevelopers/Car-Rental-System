@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { BookingPageStyles, statusConfig } from '../../assets/dummyStyles';
 import axios from "axios";
-import { FaCalendarAlt, FaCar, FaCheckCircle, FaChevronDown, FaCity, FaCreditCard, FaEdit, FaEnvelope, FaFilter, FaGasPump, FaGlobeAsia, FaMapMarkerAlt, FaMapPin, FaPhone, FaSearch, FaSync, FaTachometerAlt, FaUser, FaUserFriends } from 'react-icons/fa';
+import { FaCalendarAlt, FaCar, FaCheckCircle, FaChevronDown, FaCity, FaCreditCard, FaDownload, FaEdit, FaEnvelope, FaFileAlt, FaFilter, FaGasPump, FaGlobeAsia, FaIdCard, FaMapMarkerAlt, FaMapPin, FaPhone, FaSearch, FaSync, FaTachometerAlt, FaUser, FaUserFriends } from 'react-icons/fa';
 
 // const baseURL = "http://localhost:5000";
 const baseURL = "https://aurumdrive-backend-gamma.vercel.app";
 const api = axios.create({ baseURL, headers: {Accept: 'application/json'}});
+const CLOUDINARY_CLOUD_NAME = "der7wwaxt";
 
 // Utility functions
 const formatDate = (s) => {
@@ -20,8 +21,72 @@ const formatDate = (s) => {
         d.getFullYear();
 };
 
-const makeImageUrl = (filename) =>
-  filename ? `${baseURL}/uploads/${filename}` : "";
+const makeImageUrl = (imageRef) => {
+  if (!imageRef) return "";
+  
+  if (imageRef.includes('cloudinary.com') || imageRef.includes('res.cloudinary.com')) {
+    return imageRef;
+  }
+  
+  if (imageRef.startsWith('http://') || imageRef.startsWith('https://')) {
+    return imageRef;
+  }
+  
+  // Extract filename from local path if present (e.g., "upload/filename.jpg" -> "filename.jpg")
+  let publicId = imageRef.replace(/^upload\//, '').replace(/^\//, '');
+  
+  // Remove file extension for Cloudinary public_id
+  publicId = publicId.replace(/\.[^.]+$/, '');
+  
+  // If using a folder structure in Cloudinary, prepend it
+  const fullPublicId = CLOUDINARY_FOLDER ? `${CLOUDINARY_FOLDER}/${publicId}` : publicId;
+  
+  // Construct Cloudinary URL with transformations for optimization
+  // w_800,h_600,c_limit = limit size to 800x600, maintaining aspect ratio
+  // q_auto = automatic quality optimization
+  // f_auto = automatic format selection (WebP where supported)
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/w_800,h_600,c_limit,q_auto,f_auto/${fullPublicId}`;
+};
+
+/**
+ * Get optimized thumbnail URL from Cloudinary
+ */
+const makeThumbnailUrl = (imageRef) => {
+  if (!imageRef) return "";
+  
+  // If already a full Cloudinary URL, modify it for thumbnail
+  if (imageRef.includes('res.cloudinary.com')) {
+    return imageRef.replace('/upload/', '/upload/w_300,h_200,c_fill,q_auto,f_auto/');
+  }
+  
+  let publicId = imageRef.replace(/^upload\//, '').replace(/^\//, '');
+  publicId = publicId.replace(/\.[^.]+$/, '');
+  
+  const fullPublicId = CLOUDINARY_FOLDER ? `${CLOUDINARY_FOLDER}/${publicId}` : publicId;
+  
+  // Smaller dimensions for thumbnails, with cropping to fill
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/w_300,h_200,c_fill,q_auto,f_auto/${fullPublicId}`;
+};
+
+/**
+ * Get download URL for documents (original quality)
+ */
+const makeDownloadUrl = (imageRef) => {
+  if (!imageRef) return "";
+  
+  // If already a full Cloudinary URL, use original
+  if (imageRef.includes('res.cloudinary.com')) {
+    return imageRef.replace('/upload/', '/upload/fl_attachment/');
+  }
+  
+  let publicId = imageRef.replace(/^upload\//, '').replace(/^\//, '');
+  publicId = publicId.replace(/\.[^.]+$/, '');
+  
+  const fullPublicId = CLOUDINARY_FOLDER ? `${CLOUDINARY_FOLDER}/${publicId}` : publicId;
+  
+  // fl_attachment forces download, no transformations for original quality
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/fl_attachment/${fullPublicId}`;
+};
 
 const normalizeDetails = (d = {}, car = {}) => ({
   seats: d.seats ?? d.numSeats ?? car.seats ?? "",
@@ -93,12 +158,49 @@ const Spec = ({icon, label, value}) => (
   </div>
 );
 
+const DocumentViewer = ({ imageUrl, title, onDownload }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!imageUrl || imageError) {
+    return (
+      <div className="flex items-center justify-center h-48 bg-gray-800/30 rounded-lg border border-gray-700/50">
+        <div className="text-center text-gray-500">
+          <FaFileAlt className="mx-auto text-4xl mb-2 opacity-30" />
+          <p className="text-sm">No {title} uploaded</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group">
+      <div className="relative h-48 bg-gray-900/50 rounded-lg border border-gray-700/50 overflow-hidden">
+        <img
+          src={imageUrl}
+          alt={title}
+          className="w-full h-full object-contain hover:scale-105 transition-transform duration-300"
+          onError={() => setImageError(true)}
+          loading="lazy"
+        />
+        <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </div>
+      <button
+        onClick={onDownload}
+        className="absolute bottom-3 right-3 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center space-x-2 text-sm font-medium"
+      >
+        <FaDownload />
+        <span>Download</span>
+      </button>
+    </div>
+  );
+};
+
 const StatusIndicator = ({status, isEditing, newStatus, onStatusChange}) => {
   return isEditing ? (
     <select 
       value={newStatus} 
       onChange={onStatusChange} 
-      className='bg-gray-800/50 text-sm px-2 [y-1 rounded focus:outline-none focus:ring-1
+      className='bg-gray-800/50 text-sm px-2 py-1 rounded focus:outline-none focus:ring-1
       focus:ring-orange-500'
     >
       {Object.keys(statusConfig).filter((k) => k !== 'default').map((opt) => (
@@ -223,110 +325,176 @@ const BookingCardActions = ({
 );
 
 
-const BookingCardDetails = ({ booking }) => (
-  <div className={BookingPageStyles.bookingDetails}>
-    <div className={BookingPageStyles.bookingDetailsGrid}>
-      <Panel
-        title="Customer Details"
-        icon={<FaUser className={BookingPageStyles.panelIcon} />}
-      >
-        <Detail icon={<FaUser />} label="Full Name" value={booking.customer} />
-        <Detail icon={<FaEnvelope />} label="Email" value={booking.email} />
-        <Detail icon={<FaPhone />} label="Phone" value={booking.phone} />
-      </Panel>
+const BookingCardDetails = ({ booking }) => {
+  const handleDownload = (url, filename) => {
+    if (!url) return;
+    
+    // Use Cloudinary download URL
+    const downloadUrl = makeDownloadUrl(url);
+    
+    // Create a temporary anchor element to trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-      <Panel
-        title="Booking Details"
-        icon={<FaCalendarAlt className={BookingPageStyles.panelIcon} />}
-      >
-        <Detail
-          icon={<FaCalendarAlt />}
-          label="Pickup Date"
-          value={formatDate(booking.pickupDate)}
-        />
-        <Detail
-          icon={<FaCalendarAlt />}
-          label="Return Date"
-          value={formatDate(booking.returnDate)}
-        />
-        <Detail
-          icon={<FaCalendarAlt />}
-          label="Booking Date"
-          value={formatDate(booking.bookingDate)}
-        />
-        <Detail
-          icon={<FaCreditCard />}
-          label="Total Amount"
-          value={`$${booking.amount}`}
-        />
-      </Panel>
+  const [carImageError, setCarImageError] = useState(false);
 
-      <Panel
-        title="Address Details"
-        icon={<FaMapMarkerAlt className={BookingPageStyles.panelIcon} />}
-      >
-        <Detail
-          icon={<FaMapMarkerAlt />}
-          label="Street"
-          value={booking.address.street}
-        />
-        <Detail icon={<FaCity />} label="City" value={booking.address.city} />
-        <Detail
-          icon={<FaGlobeAsia />}
-          label="State"
-          value={booking.address.state}
-        />
-        <Detail
-          icon={<FaMapPin />}
-          label="ZIP Code"
-          value={booking.address.zipCode}
-        />
-      </Panel>
+  return (
+    <div className={BookingPageStyles.bookingDetails}>
+      <div className={BookingPageStyles.bookingDetailsGrid}>
+        <Panel
+          title="Customer Details"
+          icon={<FaUser className={BookingPageStyles.panelIcon} />}
+        >
+          <Detail icon={<FaUser />} label="Full Name" value={booking.customer} />
+          <Detail icon={<FaEnvelope />} label="Email" value={booking.email} />
+          <Detail icon={<FaPhone />} label="Phone" value={booking.phone} />
+        </Panel>
 
-      <Panel
-        title="Car Details"
-        icon={<FaCar className={BookingPageStyles.panelIcon} />}
-      >
-        <div className="flex items-center mb-4">
-          <div className={BookingPageStyles.carImageContainer}>
-            <img
-              src={makeImageUrl(booking.carImage)}
-              alt={booking.car || "car image"}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="ml-4">
-            <div className={BookingPageStyles.bookingCustomer}>
-              {booking.car || ""}
+        <Panel
+          title="Booking Details"
+          icon={<FaCalendarAlt className={BookingPageStyles.panelIcon} />}
+        >
+          <Detail
+            icon={<FaCalendarAlt />}
+            label="Pickup Date"
+            value={formatDate(booking.pickupDate)}
+          />
+          <Detail
+            icon={<FaCalendarAlt />}
+            label="Return Date"
+            value={formatDate(booking.returnDate)}
+          />
+          <Detail
+            icon={<FaCalendarAlt />}
+            label="Booking Date"
+            value={formatDate(booking.bookingDate)}
+          />
+          <Detail
+            icon={<FaCreditCard />}
+            label="Total Amount"
+            value={`$${booking.amount}`}
+          />
+        </Panel>
+
+        <Panel
+          title="Address Details"
+          icon={<FaMapMarkerAlt className={BookingPageStyles.panelIcon} />}
+        >
+          <Detail
+            icon={<FaMapMarkerAlt />}
+            label="Street"
+            value={booking.address.street}
+          />
+          <Detail icon={<FaCity />} label="City" value={booking.address.city} />
+          <Detail
+            icon={<FaGlobeAsia />}
+            label="State"
+            value={booking.address.state}
+          />
+          <Detail
+            icon={<FaMapPin />}
+            label="ZIP Code"
+            value={booking.address.zipCode}
+          />
+        </Panel>
+
+        <Panel
+          title="Car Details"
+          icon={<FaCar className={BookingPageStyles.panelIcon} />}
+        >
+          <div className="flex items-center mb-4">
+            <div className={BookingPageStyles.carImageContainer}>
+              {booking.carImage && !carImageError ? (
+                <img
+                  src={makeThumbnailUrl(booking.carImage)}
+                  alt={booking.car || "car image"}
+                  className="w-full h-full object-cover"
+                  onError={() => setCarImageError(true)}
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-800/30">
+                  <FaCar className="text-gray-600 text-4xl" />
+                </div>
+              )}
+            </div>
+            <div className="ml-4">
+              <div className={BookingPageStyles.bookingCustomer}>
+                {booking.car || ""}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Spec
-            icon={<FaUserFriends />}
-            label="Seats"
-            value={booking.details.seats}
-          />
-          <Spec
-            icon={<FaGasPump />}
-            label="Fuel"
-            value={booking.details.fuel}
-          />
-          <Spec
-            icon={<FaTachometerAlt />}
-            label="Mileage"
-            value={booking.details.mileage}
-          />
-          <Spec
-            icon={<FaCheckCircle />}
-            label="Transmission"
-            value={booking.details.transmission}
-          />
-        </div>
-      </Panel>
+          <div className="grid grid-cols-2 gap-4">
+            <Spec
+              icon={<FaUserFriends />}
+              label="Seats"
+              value={booking.details.seats}
+            />
+            <Spec
+              icon={<FaGasPump />}
+              label="Fuel"
+              value={booking.details.fuel}
+            />
+            <Spec
+              icon={<FaTachometerAlt />}
+              label="Mileage"
+              value={booking.details.mileage}
+            />
+            <Spec
+              icon={<FaCheckCircle />}
+              label="Transmission"
+              value={booking.details.transmission}
+            />
+          </div>
+        </Panel>
+
+        {/* Customer Documents Panel */}
+        <Panel
+          title="Customer Documents"
+          icon={<FaIdCard className={BookingPageStyles.panelIcon} />}
+        >
+          <div className="space-y-4">
+            <div>
+              <div className={BookingPageStyles.detailLabel + " mb-2"}>
+                <FaIdCard className="inline mr-2" />
+                National ID / Passport
+              </div>
+              <DocumentViewer
+                imageUrl={booking.idPhoto}
+                title="ID"
+                onDownload={() => handleDownload(
+                  booking.idPhoto,
+                  `${booking.customer}_ID.jpg`
+                )}
+              />
+            </div>
+
+            <div>
+              <div className={BookingPageStyles.detailLabel + " mb-2"}>
+                <FaFileAlt className="inline mr-2" />
+                Driver's License
+              </div>
+              <DocumentViewer
+                imageUrl={booking.licensePhoto}
+                title="Driver's License"
+                onDownload={() => handleDownload(
+                  booking.licensePhoto,
+                  `${booking.customer}_License.jpg`
+                )}
+              />
+            </div>
+          </div>
+        </Panel>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const BookingCard = ({
   booking,
@@ -501,6 +669,8 @@ const BookingPage = () => {
           phone: b.phone || "",
           car: carInfo.title || "",
           carImage: carInfo.image || "",
+          idPhoto: makeImageUrl(b.idPhoto || ""),
+          licensePhoto: makeImageUrl(b.licensePhoto || ""),
           pickupDate: b.pickupDate || b.pickup || b.startDate || "",
           returnDate: b.returnDate || b.return || b.endDate || "",
           bookingDate: b.bookingDate || b.createdAt || "",
@@ -644,94 +814,3 @@ const BookingPage = () => {
 }
 
 export default BookingPage
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-

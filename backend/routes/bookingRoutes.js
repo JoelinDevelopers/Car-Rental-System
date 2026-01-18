@@ -8,23 +8,36 @@ import {
   updateBooking,
   updateBookingStatus,
 } from "../controllers/bookingController.js";
-import { upload } from "../config/cloudinary.js"; // ✅ FIXED: Use named export with curly braces
+import { upload } from "../config/cloudinary.js";
 
 const bookingRouter = express.Router();
 
-// Create booking with image upload
+// Create booking with multiple file uploads (carImage, idPhoto, licensePhoto)
 bookingRouter.post(
   "/",
   authMiddleware,
-  upload.single("carImage"), // ✅ Now this will work
+  upload.fields([
+    { name: "carImage", maxCount: 1 },
+    { name: "idPhoto", maxCount: 1 },
+    { name: "licensePhoto", maxCount: 1 }
+  ]),
   createBooking
 );
 
 bookingRouter.get("/", getBookings);
 bookingRouter.get("/mybooking", authMiddleware, getMyBookings);
 
-// Update booking with image upload
-bookingRouter.put("/:id", upload.single("carImage"), updateBooking);
+// Update booking with multiple file uploads
+bookingRouter.put(
+  "/:id",
+  upload.fields([
+    { name: "carImage", maxCount: 1 },
+    { name: "idPhoto", maxCount: 1 },
+    { name: "licensePhoto", maxCount: 1 }
+  ]),
+  updateBooking
+);
+
 bookingRouter.patch("/:id/status", updateBookingStatus);
 bookingRouter.delete("/:id", deleteBooking);
 

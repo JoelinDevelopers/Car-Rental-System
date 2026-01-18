@@ -34,7 +34,8 @@ const VerifyPaymentPage = () => {
       try {
         setStatusMsg('Confirming payment with the server....');
 
-        const API_BASE = 'http://localhost:5000';
+        // const API_BASE = 'http://localhost:5000';
+        const API_BASE = "https://aurumdrive-backend-gamma.vercel.app";
         const res = await axios.get(`${API_BASE}/api/payments/confirm`, {
           params: {session_id},
           headers: token ? {Authorization: `Bearer ${token}`} : {},

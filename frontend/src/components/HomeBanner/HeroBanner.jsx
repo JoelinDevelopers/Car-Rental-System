@@ -46,7 +46,7 @@ function Hero() {
                 >
                     <SwiperSlide>
                         <div className="hero-slide hero-slide1 w-full h-full flex
-                          items-center px-[12%]">
+                          items-center px-[12%] mt-2">
                             <div className="hero-content text-white lg:w-[60%]">
                                 <span className="font-bricolage text-xs sm:text-sm lg:text-md uppercase
                                  tracking-widest bg-yellow-700 px-2 py-1 rounded-sm">- Simply the Best</span>
