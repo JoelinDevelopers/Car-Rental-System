@@ -10,13 +10,11 @@ dotenv.config();
 const CLIENT_URL = 'https://aurumdriverentals.com'
 const STRIPE_API_VERSION = "2022-11-15";
 
-//GET STRIPE FROM .ENV
 const getStripe = () => {
   const key = (process.env.STRIPE_SECRET_KEY || '').trim();
   return new Stripe(key, {apiVersion: STRIPE_API_VERSION})
 };
 
-// HELPER: Send notifications in background (non-blocking)
 const sendBookingNotifications = async (booking) => {
   console.log('📢 Starting to send notifications for paid booking...');
   
@@ -36,7 +34,6 @@ Payment: PAID ✅
     console.log('📱 Attempting WhatsApp to:', process.env.ADMIN_WHATSAPP);
     console.log('📧 Attempting Email to:', booking.email, 'and', process.env.ADMIN_EMAIL);
 
-    // Send all notifications (don't await - let them run in background)
     Promise.all([
       sendWhatsAppTwilio({
         to: process.env.ADMIN_WHATSAPP,
@@ -46,7 +43,6 @@ Payment: PAID ✅
         return result;
       }).catch(err => {
         console.error('❌ WhatsApp notification failed:', err.message);
-        console.error('   Error code:', err.code);
         throw err;
       }),
       
@@ -75,11 +71,10 @@ Payment: PAID ✅
 
   } catch (err) {
     console.error('❌ Notification error:', err.message);
-    console.error('   Stack:', err.stack);
   }
 };
 
-// CREATE A BOOKING BY PAYMENT DONE
+// ✅ FIXED: Use existing booking instead of creating new one
 export const createCheckoutSession = async (req, res, next) => {
   try {
     if (!req.body) return res.status(400).json({
@@ -88,6 +83,7 @@ export const createCheckoutSession = async (req, res, next) => {
     })
 
     const {
+      bookingId, // ✅ CRITICAL: Get existing booking ID from request
       userId,
       customer,
       email,
@@ -101,16 +97,29 @@ export const createCheckoutSession = async (req, res, next) => {
       carImage,  
     } = req.body;
 
-    // minimal validation
+    console.log('💳 Creating checkout session...');
+    console.log('💳 Booking ID:', bookingId);
+
+    // Minimal validation
     const total = Number(amount);
-    if (!total || Number.isNaN(total) || total <= 0) return res.status(400).json({ success: false, message: "Invalid amount" });
-    if (!email) return res.status(400).json({ success: false, message: "Email required" });
-    if (!pickupDate || !returnDate) return res.status(400).json({ success: false, message: "pickupDate and returnDate required" });
+    if (!total || Number.isNaN(total) || total <= 0) {
+      return res.status(400).json({ success: false, message: "Invalid amount" });
+    }
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email required" });
+    }
+    if (!pickupDate || !returnDate) {
+      return res.status(400).json({ success: false, message: "pickupDate and returnDate required" });
+    }
 
     const pd = new Date(pickupDate);
     const rd = new Date(returnDate);
-    if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) return res.status(400).json({ success: false, message: "Invalid dates" });
-    if (rd < pd) return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
+    if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) {
+      return res.status(400).json({ success: false, message: "Invalid dates" });
+    }
+    if (rd < pd) {
+      return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
+    }
 
     let carField = car;
     if (typeof car === 'string') {
@@ -118,31 +127,73 @@ export const createCheckoutSession = async (req, res, next) => {
       catch { carField = { name: car }; }
     }
 
-    // create booking (pending)
-    const booking = await Booking.create({
-      userId: userId,
-      customer: String(customer ?? ""),
-      email: String(email ?? ""),
-      phone: String(phone ?? ""),
-      car: carField ?? {},
-      carImage: String(carImage ?? ""),
-      pickupDate: pd,
-      returnDate: rd,
-      amount: total,
-      paymentStatus: "pending",
-      details: typeof details === "string" ? JSON.parse(details) : (details || {}),
-      address: typeof address === "string" ? JSON.parse(address) : (address || {}),
-      status: "pending",
-      currency: "KES",
-    });
+    // ✅ CRITICAL FIX: Use existing booking if bookingId provided
+    let booking;
+    
+    if (bookingId) {
+      console.log('✅ Using existing booking:', bookingId);
+      booking = await Booking.findById(bookingId);
+      
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      // ✅ Check if payment already completed
+      if (booking.paymentStatus === 'paid') {
+        console.log('⚠️ Booking already paid - returning existing session');
+        
+        // If session exists, return it
+        if (booking.sessionId && booking.stripeSession?.url) {
+          return res.json({
+            success: true,
+            id: booking.sessionId,
+            url: booking.stripeSession.url,
+            bookingId: booking._id,
+            _alreadyPaid: true
+          });
+        }
+      }
+
+      console.log('✅ Booking found, creating Stripe session...');
+    } else {
+      // ✅ FALLBACK: Only create booking if no bookingId provided (legacy support)
+      console.log('⚠️ No bookingId provided - creating new booking (legacy mode)');
+      
+      booking = await Booking.create({
+        userId: userId,
+        customer: String(customer ?? ""),
+        email: String(email ?? ""),
+        phone: String(phone ?? ""),
+        car: carField ?? {},
+        carImage: String(carImage ?? ""),
+        pickupDate: pd,
+        returnDate: rd,
+        amount: total,
+        paymentStatus: "pending",
+        details: typeof details === "string" ? JSON.parse(details) : (details || {}),
+        address: typeof address === "string" ? JSON.parse(address) : (address || {}),
+        status: "pending",
+      });
+      
+      console.log('✅ New booking created:', booking._id);
+    }
 
     let stripe;
-    try { stripe = getStripe(); } catch (err) {
-      await Booking.findByIdAndDelete(booking._id).catch(() => { });
+    try { 
+      stripe = getStripe(); 
+    } catch (err) {
+      // Only delete if we just created it
+      if (!bookingId) {
+        await Booking.findByIdAndDelete(booking._id).catch(() => { });
+      }
       return res.status(500).json({
         success: false,
-        message: 'Payment not configure', error: err.message
-      })
+        message: 'Payment not configured', 
+        error: err.message
+      });
     }
 
     let session;
@@ -156,7 +207,7 @@ export const createCheckoutSession = async (req, res, next) => {
             price_data: {
               currency: "kes",
               product_data: {
-                name: (carField && (carField.name || carField.title)) || "Car Rental",
+                name: (carField && (carField.make || carField.name || carField.title)) || "Car Rental",
                 description: `Rental ${pickupDate} → ${returnDate}`,
               },
               unit_amount: Math.round(total * 100),
@@ -173,9 +224,14 @@ export const createCheckoutSession = async (req, res, next) => {
           pickupDate: String(pickupDate || ""),
           returnDate: String(returnDate || ""),
         },
-      })
+      });
+      
+      console.log('✅ Stripe session created:', session.id);
     } catch (stripeErr) {
-      await Booking.findByIdAndDelete(booking._id).catch(() => { });
+      // Only delete if we just created it
+      if (!bookingId) {
+        await Booking.findByIdAndDelete(booking._id).catch(() => { });
+      }
       return res.status(500).json({
         success: false,
         message: 'Failed to create Stripe Checkout Session',
@@ -183,6 +239,7 @@ export const createCheckoutSession = async (req, res, next) => {
       });
     }
 
+    // Update booking with session info
     booking.sessionId = session.id;
     booking.stripeSession = {
       id: session.id,
@@ -190,26 +247,30 @@ export const createCheckoutSession = async (req, res, next) => {
     };
     await booking.save();
 
+    console.log('✅ Checkout session created successfully');
+
     return res.json({
       success: true,
       id: session.id,
       url: session.url,
-      bookinId: booking._id
+      bookingId: booking._id
     });
   } catch (err) {
-    console.error('CheckoutSession Error', err);
+    console.error('❌ CheckoutSession Error', err);
     return res.status(500).json({
       success: false,
       message: err.message || 'Server Error'
-    })
+    });
   }
 }
 
-//SUCCESSFUL PAYMENT VERIFICATION
+// SUCCESSFUL PAYMENT VERIFICATION
 export const confirmPayment = async (req, res, next) => {
   try {
     const { session_id } = req.query;
-    if (!session_id) return res.status(400).json({ success: false, message: 'Session_id required'});
+    if (!session_id) {
+      return res.status(400).json({ success: false, message: 'Session_id required'});
+    }
 
     let stripe;
     try {
@@ -219,60 +280,72 @@ export const confirmPayment = async (req, res, next) => {
         success: false,
         message: 'Payment not configured',
         error: err.message
-      })
+      });
     }
 
     const session = await stripe.checkout.sessions.retrieve(session_id);
-    if (!session) return res.status(404).json({
-      success: false,
-      message: 'Session not found'
-    });
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
 
-    if (session.payment_status !== 'paid')
+    if (session.payment_status !== 'paid') {
       return res.status(400).json({
         success: false,
         message: `Payment not completed. status=${session.payment_status}`,
         session
       });
+    }
 
     const bookingId = session.metadata?.bookingId;
     let order = null;
 
     if (bookingId) {
-      order = await Booking.findByIdAndUpdate(bookingId, {
-        paymentStatus: 'paid',
-        status: 'active',
-        paymentIntentId: session.payment_intent || '',
-        paymentDetails: {
-          amount_total: session.amount_total || null,
-          currency: session.currency || null
-        },
-      }, { new: true });
+      order = await Booking.findByIdAndUpdate(
+        bookingId, 
+        {
+          paymentStatus: 'paid',
+          status: 'active',
+          paymentIntentId: session.payment_intent || '',
+          paymentDetails: {
+            amount_total: session.amount_total || null,
+            currency: session.currency || null
+          },
+        }, 
+        { new: true }
+      );
     }
 
     if (!order) {
-      order = await Booking.findOneAndUpdate({sessionId: session_id}, {
-        paymentStatus: 'paid',
-        status: 'active',
-        paymentIntentId: session.payment_intent || '',
-        paymentDetails: {
-          amount_total: session.amount_total || null,
-          currency: session.currency || null
-        },
-      }, { new: true })
+      order = await Booking.findOneAndUpdate(
+        {sessionId: session_id}, 
+        {
+          paymentStatus: 'paid',
+          status: 'active',
+          paymentIntentId: session.payment_intent || '',
+          paymentDetails: {
+            amount_total: session.amount_total || null,
+            currency: session.currency || null
+          },
+        }, 
+        { new: true }
+      );
     }
 
-    if (!order) return res.status(404).json({
-      success: false,
-      message: 'Booking not found for this session', session
-    })
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found for this session', 
+        session
+      });
+    }
 
     console.log('✅ Payment confirmed successfully');
     
-    // ✅ RESPOND TO FRONTEND IMMEDIATELY
     res.json({ success: true, order });
 
-    // 🔔 SEND NOTIFICATIONS IN BACKGROUND (non-blocking)
     console.log('📤 Payment confirmed, queuing notifications...');
     setImmediate(() => {
       console.log('🔔 setImmediate triggered, sending notifications now...');
@@ -280,10 +353,10 @@ export const confirmPayment = async (req, res, next) => {
     });
 
   } catch (err) {
-    console.error('Confirm Payment Error:', err);
+    console.error('❌ Confirm Payment Error:', err);
     return res.status(500).json({
       success: false,
       message: err.message || 'Server Error'
-    })
+    });
   }
 }

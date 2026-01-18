@@ -9,6 +9,20 @@ import cloudinary from "../config/cloudinary.js";
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
+// ✅ CRITICAL: In-memory request deduplication cache
+const requestCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+// Cleanup old cache entries every minute
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of requestCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      requestCache.delete(key);
+    }
+  }
+}, 60000);
+
 const tryParseJSON = (v) => {
   if(typeof v !== 'string') return v;
   try {
@@ -42,7 +56,6 @@ const deleteLocalFileIfPresent = (filePath) => {
   fs.unlink(full, (err) => { if (err) console.warn('Failed to delete file:', full, err)});
 };
 
-// HELPER: Delete file from Cloudinary
 const deleteCloudinaryFile = async (cloudinaryId) => {
   if (!cloudinaryId) return;
   try {
@@ -53,7 +66,6 @@ const deleteCloudinaryFile = async (cloudinaryId) => {
   }
 };
 
-// HELPER: Send notifications in background (non-blocking)
 const sendBookingNotifications = async (booking) => {
   console.log('📢 Starting to send notifications...');
   
@@ -72,7 +84,6 @@ Status: ${booking.status}
     console.log('📱 Attempting WhatsApp to:', process.env.ADMIN_WHATSAPP);
     console.log('📧 Attempting Email to:', booking.email, 'and', process.env.ADMIN_EMAIL);
 
-    // Send all notifications (don't await - let them run in background)
     Promise.all([
       sendWhatsAppTwilio({
         to: process.env.ADMIN_WHATSAPP,
@@ -82,8 +93,6 @@ Status: ${booking.status}
         return result;
       }).catch(err => {
         console.error('❌ WhatsApp notification failed:', err.message);
-        console.error('   Error code:', err.code);
-        console.error('   Error details:', err);
         throw err;
       }),
       
@@ -112,16 +121,16 @@ Status: ${booking.status}
 
   } catch (err) {
     console.error('❌ Notification error:', err.message);
-    console.error('   Stack:', err.stack);
   }
 };
 
-// ✅ FIXED: Generate unique idempotency key for each booking attempt
-const generateIdempotencyKey = (data) => {
-  return `${data.email}-${data.car}-${data.pickupDate}-${data.returnDate}-${Date.now()}`;
+// ✅ Generate deduplication key
+const generateDeduplicationKey = (data) => {
+  const { email, car, pickupDate, returnDate, customer } = data;
+  const carId = typeof car === 'string' ? car : (car?.id || JSON.stringify(car));
+  return `${email}-${carId}-${pickupDate}-${returnDate}-${customer}`.toLowerCase();
 };
 
-// HELPER: Execute booking creation WITHOUT retry logic
 const executeBookingCreation = async (req) => {
   const session = await mongoose.startSession();
   
@@ -145,7 +154,6 @@ const executeBookingCreation = async (req) => {
       throw new Error('Invalid pickup and return date');
     }
 
-    // ✅ CHECK: Minimum 3 days booking period
     const daysDiff = Math.ceil((ret - pickup) / (1000 * 60 * 60 * 24));
     if (daysDiff < 3) {
       await session.abortTransaction();
@@ -181,15 +189,14 @@ const executeBookingCreation = async (req) => {
 
     const carId = carSummary.id;
     
-    // ✅ NO AVAILABILITY CHECK - Multiple bookings allowed for same car
     console.log('✅ No availability check - multiple bookings allowed for same car');
 
-    // Handle ID photo upload (from req.files if using multer)
+    // Handle ID photo upload
     let idPhotoUrl = '';
     let idPhotoCloudinaryId = '';
     if (req.files?.idPhoto) {
-      idPhotoUrl = req.files.idPhoto[0].path; // Cloudinary URL
-      idPhotoCloudinaryId = req.files.idPhoto[0].filename; // Cloudinary public_id
+      idPhotoUrl = req.files.idPhoto[0].path;
+      idPhotoCloudinaryId = req.files.idPhoto[0].filename;
       console.log('✅ ID photo uploaded to Cloudinary:', idPhotoUrl);
     }
 
@@ -197,8 +204,8 @@ const executeBookingCreation = async (req) => {
     let licensePhotoUrl = '';
     let licensePhotoCloudinaryId = '';
     if (req.files?.licensePhoto) {
-      licensePhotoUrl = req.files.licensePhoto[0].path; // Cloudinary URL
-      licensePhotoCloudinaryId = req.files.licensePhoto[0].filename; // Cloudinary public_id
+      licensePhotoUrl = req.files.licensePhoto[0].path;
+      licensePhotoCloudinaryId = req.files.licensePhoto[0].filename;
       console.log('✅ License photo uploaded to Cloudinary:', licensePhotoUrl);
     }
 
@@ -222,7 +229,6 @@ const executeBookingCreation = async (req) => {
       status: "pending",
     };
 
-    // ✅ CREATE BOOKING (no retry - let it fail if there's an issue)
     const createdArr = await Booking.create([bookingData], { session });
     const createdBooking = createdArr[0];
     
@@ -231,22 +237,8 @@ const executeBookingCreation = async (req) => {
     
     session.endSession();
     
-    // ✅ Update car bookings OUTSIDE of transaction (non-critical operation)
-    const bookingEntry = {
-      bookingid: createdBooking._id,
-      pickupDate: createdBooking.pickupDate,
-      returnDate: createdBooking.returnDate,
-      status: createdBooking.status,
-    };
-
-    // This runs outside transaction, so it won't cause conflicts
-    await Car.findByIdAndUpdate(
-      carId, 
-      { $push: { bookings: bookingEntry } }
-    ).catch(err => {
-      console.error('⚠️ Warning: Failed to update car bookings array:', err.message);
-      // Don't fail the whole booking if this fails
-    });
+    // ✅ REMOVED: Car bookings update - handled by post-save hook in bookingModel.js
+    // This was causing duplicates because both controller and model were updating car.bookings
     
     const saved = await Booking.findById(createdBooking._id);
     return saved;
@@ -257,7 +249,7 @@ const executeBookingCreation = async (req) => {
     }
     session.endSession();
     
-    // ✅ Cleanup uploaded photos if booking creation failed
+    // Cleanup uploaded photos if booking creation failed
     if (req.files?.idPhoto?.[0]?.filename) {
       await deleteCloudinaryFile(req.files.idPhoto[0].filename);
     }
@@ -269,32 +261,82 @@ const executeBookingCreation = async (req) => {
   }
 };
 
-//CREATE BOOKING
+//CREATE BOOKING - WITH DEDUPLICATION
 export const createBooking = async (req, res) => {
-  console.log('🔵 CREATE BOOKING CALLED - Request from:', req.headers.origin || 'unknown');
-  console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
-  console.log('🔵 Files received:', req.files ? Object.keys(req.files) : 'none');
+  const requestId = req.headers['x-request-id'] || `${Date.now()}-${Math.random()}`;
+  
+  console.log('🔵 CREATE BOOKING CALLED');
+  console.log('🔵 Request ID:', requestId);
+  console.log('🔵 Request from:', req.headers.origin || 'unknown');
+  console.log('🔵 User-Agent:', req.headers['user-agent']?.substring(0, 50));
+  console.log('🔵 Body:', JSON.stringify({
+    customer: req.body.customer,
+    email: req.body.email,
+    car: typeof req.body.car === 'string' ? req.body.car : 'object',
+    pickupDate: req.body.pickupDate,
+    returnDate: req.body.returnDate
+  }));
   
   try {
-    // ✅ EXECUTE BOOKING CREATION (no retry logic)
+    // ✅ CRITICAL: Generate deduplication key
+    const dedupKey = generateDeduplicationKey(req.body);
+    console.log('🔑 Deduplication Key:', dedupKey);
+    
+    // ✅ CHECK: If this exact request was already processed recently
+    const cachedRequest = requestCache.get(dedupKey);
+    const now = Date.now();
+    
+    if (cachedRequest && (now - cachedRequest.timestamp) < CACHE_TTL) {
+      console.log('⚠️ DUPLICATE REQUEST DETECTED - Returning cached response');
+      console.log('⚠️ Original request was', (now - cachedRequest.timestamp) / 1000, 'seconds ago');
+      console.log('⚠️ Booking ID:', cachedRequest.booking._id);
+      
+      return res.status(201).json({
+        success: true,
+        booking: cachedRequest.booking,
+        _isDuplicate: true // Flag for debugging
+      });
+    }
+
+    // ✅ MARK: Request as processing to prevent concurrent duplicates
+    requestCache.set(dedupKey, {
+      timestamp: now,
+      processing: true
+    });
+
+    console.log('✅ New unique request - proceeding with booking creation');
+    
     const saved = await executeBookingCreation(req);
 
-    console.log('📤 Response sent to frontend, queuing notifications...');
+    // ✅ UPDATE: Cache with successful result
+    requestCache.set(dedupKey, {
+      timestamp: now,
+      booking: saved,
+      processing: false
+    });
 
-    // ✅ RESPOND TO FRONTEND IMMEDIATELY (before notifications)
+    console.log('📤 Response sent to frontend, queuing notifications...');
+    console.log('📤 Booking ID:', saved._id);
+
+    // ✅ RESPOND TO FRONTEND IMMEDIATELY
     res.status(201).json({
       success: true,
       booking: saved
     });
 
-    // 🔔 SEND NOTIFICATIONS IN BACKGROUND (non-blocking)
+    // 🔔 SEND NOTIFICATIONS IN BACKGROUND
     setImmediate(() => {
       console.log('🔔 setImmediate triggered, sending notifications now...');
       sendBookingNotifications(saved);
     });
 
   } catch (err) {
-    console.error('❌ Create Booking Error:', err);
+    console.error('❌ Create Booking Error:', err.message);
+    console.error('❌ Stack:', err.stack);
+    
+    // ✅ REMOVE: Failed request from cache
+    const dedupKey = generateDeduplicationKey(req.body);
+    requestCache.delete(dedupKey);
     
     const statusCode = 
       err.message.includes('Missing required fields') ? 400 :
@@ -377,7 +419,6 @@ export const updateBooking = async (req, res, next) => {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    //image handling
     if (req.file) {
       if (booking.carImage && booking.carImage.startsWith("/uploads/")) deleteLocalFileIfPresent(booking.carImage);
       booking.carImage = `/uploads/${req.file.filename}`;
@@ -388,9 +429,7 @@ export const updateBooking = async (req, res, next) => {
       booking.carImage = req.body.carImage || booking.carImage;
     }
 
-    // Handle ID photo update
     if (req.files?.idPhoto) {
-      // Delete old photo from Cloudinary
       if (booking.idPhotoCloudinaryId) {
         await deleteCloudinaryFile(booking.idPhotoCloudinaryId);
       }
@@ -399,9 +438,7 @@ export const updateBooking = async (req, res, next) => {
       console.log('✅ ID photo updated');
     }
 
-    // Handle license photo update
     if (req.files?.licensePhoto) {
-      // Delete old photo from Cloudinary
       if (booking.licensePhotoCloudinaryId) {
         await deleteCloudinaryFile(booking.licensePhotoCloudinaryId);
       }
@@ -456,11 +493,9 @@ export const deleteBooking = async (req, res, next) => {
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    // Delete car image if local
     if (booking.carImage && booking.carImage.startsWith('/uploads/'))
        deleteLocalFileIfPresent(booking.carImage);
 
-    // Delete ID and license photos from Cloudinary
     if (booking.idPhotoCloudinaryId) {
       await deleteCloudinaryFile(booking.idPhotoCloudinaryId);
     }
