@@ -116,9 +116,13 @@ Status: ${booking.status}
   }
 };
 
-// HELPER: Execute booking creation with retry logic
-const executeBookingCreation = async (req, retryCount = 0) => {
-  const maxRetries = 3;
+// ✅ FIXED: Generate unique idempotency key for each booking attempt
+const generateIdempotencyKey = (data) => {
+  return `${data.email}-${data.car}-${data.pickupDate}-${data.returnDate}-${Date.now()}`;
+};
+
+// HELPER: Execute booking creation WITHOUT retry logic
+const executeBookingCreation = async (req) => {
   const session = await mongoose.startSession();
   
   try {
@@ -139,6 +143,14 @@ const executeBookingCreation = async (req, retryCount = 0) => {
       await session.abortTransaction();
       session.endSession();
       throw new Error('Invalid pickup and return date');
+    }
+
+    // ✅ CHECK: Minimum 3 days booking period
+    const daysDiff = Math.ceil((ret - pickup) / (1000 * 60 * 60 * 24));
+    if (daysDiff < 3) {
+      await session.abortTransaction();
+      session.endSession();
+      throw new Error('Minimum booking period is 3 days');
     }
 
     // Resolve car summary
@@ -169,8 +181,7 @@ const executeBookingCreation = async (req, retryCount = 0) => {
 
     const carId = carSummary.id;
     
-    // ✅ AVAILABILITY CHECK REMOVED
-    // Cars can now be booked by multiple users for the same dates
+    // ✅ NO AVAILABILITY CHECK - Multiple bookings allowed for same car
     console.log('✅ No availability check - multiple bookings allowed for same car');
 
     // Handle ID photo upload (from req.files if using multer)
@@ -193,7 +204,9 @@ const executeBookingCreation = async (req, retryCount = 0) => {
 
     const bookingData = {
       userId: req?.user?.id || req.user?._id || null,
-      customer, email, phone,
+      customer, 
+      email, 
+      phone,
       car: carSummary,
       carImage: carImage || carSummary.image || "",
       pickupDate: pickup,
@@ -209,15 +222,16 @@ const executeBookingCreation = async (req, retryCount = 0) => {
       status: "pending",
     };
 
+    // ✅ CREATE BOOKING (no retry - let it fail if there's an issue)
     const createdArr = await Booking.create([bookingData], { session });
     const createdBooking = createdArr[0];
     
     await session.commitTransaction();
-    console.log('✅ Transaction committed successfully');
+    console.log('✅ Transaction committed successfully - Booking ID:', createdBooking._id);
     
     session.endSession();
     
-    // Update car bookings OUTSIDE of transaction to avoid write conflicts
+    // ✅ Update car bookings OUTSIDE of transaction (non-critical operation)
     const bookingEntry = {
       bookingid: createdBooking._id,
       pickupDate: createdBooking.pickupDate,
@@ -230,7 +244,7 @@ const executeBookingCreation = async (req, retryCount = 0) => {
       carId, 
       { $push: { bookings: bookingEntry } }
     ).catch(err => {
-      console.error('Warning: Failed to update car bookings array:', err.message);
+      console.error('⚠️ Warning: Failed to update car bookings array:', err.message);
       // Don't fail the whole booking if this fails
     });
     
@@ -243,19 +257,12 @@ const executeBookingCreation = async (req, retryCount = 0) => {
     }
     session.endSession();
     
-    // Cleanup uploaded photos if booking creation failed
+    // ✅ Cleanup uploaded photos if booking creation failed
     if (req.files?.idPhoto?.[0]?.filename) {
       await deleteCloudinaryFile(req.files.idPhoto[0].filename);
     }
     if (req.files?.licensePhoto?.[0]?.filename) {
       await deleteCloudinaryFile(req.files.licensePhoto[0].filename);
-    }
-    
-    // Retry on write conflict
-    if (err.code === 112 && retryCount < maxRetries) {
-      console.log(`⚠️ Write conflict detected, retrying... (attempt ${retryCount + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1))); // Exponential backoff
-      return executeBookingCreation(req, retryCount + 1);
     }
     
     throw err;
@@ -269,6 +276,7 @@ export const createBooking = async (req, res) => {
   console.log('🔵 Files received:', req.files ? Object.keys(req.files) : 'none');
   
   try {
+    // ✅ EXECUTE BOOKING CREATION (no retry logic)
     const saved = await executeBookingCreation(req);
 
     console.log('📤 Response sent to frontend, queuing notifications...');
@@ -291,6 +299,7 @@ export const createBooking = async (req, res) => {
     const statusCode = 
       err.message.includes('Missing required fields') ? 400 :
       err.message.includes('Invalid') ? 400 :
+      err.message.includes('Minimum booking period') ? 400 :
       err.message.includes('not found') ? 404 :
       500;
     
