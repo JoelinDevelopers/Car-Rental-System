@@ -94,6 +94,7 @@ const CarDetail = () => {
     });
     const [activeField, setActiveField] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false); // ✅ NEW: Prevent double submission
     const fetchControllerRef = useRef(null);
     const submitControllerRef = useRef(null);
     const [today, setToday] = useState(todayISO());
@@ -197,12 +198,29 @@ const CarDetail = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        // ✅ PREVENT DOUBLE SUBMISSION
+        if (isProcessing || submitting) {
+            console.log('⚠️ Submission already in progress, ignoring...');
+            return;
+        }
+
         if (!formData.pickupDate || !formData.returnDate) {
             toast.error("Please select pickup and return dates.");
             return;
         }
-        if (new Date(formData.returnDate) < new Date(formData.pickupDate)) {
+        
+        const pickupDateObj = new Date(formData.pickupDate);
+        const returnDateObj = new Date(formData.returnDate);
+        
+        if (returnDateObj < pickupDateObj) {
             toast.error("Return date must be the same or after pickup date.");
+            return;
+        }
+
+        // ✅ MINIMUM 3 DAYS VALIDATION
+        const daysDiff = calculateDays(formData.pickupDate, formData.returnDate);
+        if (daysDiff < 3) {
+            toast.error("Minimum booking period is 3 days.");
             return;
         }
 
@@ -215,12 +233,20 @@ const CarDetail = () => {
             return;
         }
 
+        // ✅ SET BOTH FLAGS TO PREVENT DOUBLE SUBMISSION
         setSubmitting(true);
+        setIsProcessing(true);
+
+        // ✅ ABORT PREVIOUS REQUEST IF EXISTS
         if (submitControllerRef.current) {
             try {
                 submitControllerRef.current.abort();
-            } catch { }
+                console.log('🛑 Aborted previous request');
+            } catch (err) {
+                console.log('Previous controller already aborted');
+            }
         }
+        
         const controller = new AbortController();
         submitControllerRef.current = controller;
 
@@ -324,6 +350,10 @@ const CarDetail = () => {
                     position: "top-right",
                     autoClose: 1200,
                 });
+                
+                // ✅ CLEAR CONTROLLER BEFORE REDIRECT
+                submitControllerRef.current = null;
+                
                 setTimeout(() => {
                     window.location.href = paymentRes.data.url;
                 }, 1200);
@@ -360,7 +390,10 @@ const CarDetail = () => {
                 err?.code === "ERR_CANCELED" ||
                 err?.name === "CanceledError" ||
                 err?.message === "canceled";
-            if (canceled) return;
+            if (canceled) {
+                console.log('Request was cancelled');
+                return;
+            }
 
             console.error("Booking error:", err);
             const serverMessage =
@@ -370,7 +403,10 @@ const CarDetail = () => {
                 "Booking failed";
             toast.error(String(serverMessage));
         } finally {
+            // ✅ RESET FLAGS ONLY IF NOT REDIRECTING
             setSubmitting(false);
+            setIsProcessing(false);
+            submitControllerRef.current = null;
         }
     };
 
@@ -517,7 +553,7 @@ const CarDetail = () => {
                                 </span>
                             </h2>
                             <p className={carDetailStyles.bookingSubtitle}>
-                                Fast · Secure · Easy
+                                Fast · Secure · Easy · Minimum 3 Days
                             </p>
 
                             <form onSubmit={handleSubmit} className={carDetailStyles.form}>
@@ -582,6 +618,13 @@ const CarDetail = () => {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Show days warning if less than 3 */}
+                                {formData.pickupDate && formData.returnDate && days < 3 && (
+                                    <div className="text-yellow-400 text-sm mt-2 px-3 py-2 bg-yellow-900/20 rounded-lg border border-yellow-400/30">
+                                        ⚠️ Minimum booking period is 3 days. Currently selected: {days} day{days !== 1 ? 's' : ''}
+                                    </div>
+                                )}
 
                                 <div className="flex flex-col">
                                     <label className={carDetailStyles.formLabel}>
@@ -890,12 +933,16 @@ const CarDetail = () => {
 
                                 <button
                                     type="submit"
-                                    disabled={submitting}
+                                    disabled={submitting || isProcessing || (formData.pickupDate && formData.returnDate && days < 3)}
                                     className={carDetailStyles.submitButton}
+                                    style={{
+                                        opacity: (submitting || isProcessing || (formData.pickupDate && formData.returnDate && days < 3)) ? 0.5 : 1,
+                                        cursor: (submitting || isProcessing || (formData.pickupDate && formData.returnDate && days < 3)) ? 'not-allowed' : 'pointer'
+                                    }}
                                 >
                                     <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
                                     <span>
-                                        {submitting ? "Confirming..." : "Confirm Booking"}
+                                        {submitting ? "Processing..." : "Confirm Booking"}
                                     </span>
                                 </button>
                             </form>
@@ -907,4 +954,4 @@ const CarDetail = () => {
     );
 };
 
-export default CarDetail;
+export default CarDetail

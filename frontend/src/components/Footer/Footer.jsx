@@ -100,7 +100,7 @@ const Footer = () => {
                         <ul className={styles.contactList}>
                             <li className={styles.contactItem}>
                                 <FaMapMarkedAlt className={styles.contactIcon} />
-                                <span>123 Drive Avenue, Auto City, NAI 90201</span>
+                                <span>Nairobi Westlands, Mogotio Road 16, suit 004</span>
                             </li>
                             <li className={styles.contactItem}>
                                 <FaPhone className={styles.contactIcon} />

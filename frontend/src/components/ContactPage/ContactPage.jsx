@@ -15,22 +15,35 @@ const Contact = () => {
 
   const handleChange = (e) => {
     const {name, value} = e.target;
-
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleFocus = (field) => {
-    setActiveField(field);
+  const handleFocus = (field) => setActiveField(field);
+  const handleBlur = () => setActiveField(null);
+
+  // OPEN WHATSAPP CHAT
+  const openWhatsApp = (phone, name, car) => {
+    if (!phone) return;
+    const whatsappMessage = encodeURIComponent(
+      `Hello ${name || ""}, regarding your booking for ${car || "your car"} on AurumDrive.`
+    );
+    window.open(`https://wa.me/${phone.replace(/\D/g, "")}?text=${whatsappMessage}`, '_blank');
   };
 
-  const handleBlur = () => {
-    setActiveField(null);
+  // OPEN EMAIL CLIENT
+  const openEmail = (email, name, car) => {
+    if (!email) return;
+    const subject = encodeURIComponent("AurumDrive Booking Inquiry");
+    const body = encodeURIComponent(
+      `Hello ${name || ""},\n\nRegarding your booking for ${car || "your car"}.\n\nBest regards,\nAurumDrive`
+    );
+    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
   };
 
-  // WHATSAPP API
+  // WHATSAPP API FORM SUBMIT
   const handleSubmit = (e) => {
     e.preventDefault();
     const whatsappMessage =
@@ -43,6 +56,7 @@ const Contact = () => {
 
     setFormData({ name: '', email: '', phone: '', carType: '', message: '' });
   };
+
   return (
     <div className={styles.container}>
       <div className={styles.diamondPattern}>
@@ -59,7 +73,6 @@ const Contact = () => {
         }}></div>
       </div>
 
-      {/* FLOATING PARTICLES */}
       <div className={styles.floatingTriangles}>
         {[...Array(15)].map((_, i) => (
           <div 
@@ -76,7 +89,6 @@ const Contact = () => {
         ))}
       </div>
 
-      {/* TITLE */}
       <div className={styles.content}>
         <div className={styles.titleContainer}>
           <h1 className={styles.title}>Contact Our Team</h1>
@@ -118,11 +130,25 @@ const Contact = () => {
                       <div>
                         <h3 className={styles.infoLabel}>{info.label}</h3>
                         <p className={styles.infoValue}>
-                          {info.value}
-                          {i === 2 && (
-                            <span className="block text-gray-500">
-                              Sunday: 10AM-6PM
-                            </span>
+                          {i === 0 ? (
+                            <button
+                              onClick={() => openWhatsApp(info.value, "Customer", "selected car")}
+                              className="text-green-400 hover:underline"
+                            >
+                              {info.value}
+                            </button>
+                          ) : i === 1 ? (
+                            <button
+                              onClick={() => openEmail(info.value, "Customer", "selected car")}
+                              className="text-orange-400 hover:underline"
+                            >
+                              {info.value}
+                            </button>
+                          ) : (
+                            <>
+                              {info.value}
+                              <span className="block text-gray-500">Sunday: 10AM-6PM</span>
+                            </>
                           )}
                         </p>
                       </div>
@@ -130,16 +156,6 @@ const Contact = () => {
                   ))
                 }
               </div>
-
-              {/* <div className={styles.offerContainer}>
-                <div className="flex items-center">
-                  <FaCalendarAlt className={styles.offerIcon} />
-                  <span className={styles.offerTitle}>Special Offer</span>
-                </div>
-                <p className={styles.offerText}>
-                  Book for 3+ days and get 10% discount
-                </p>
-              </div> */}
             </div>
           </div>
 
@@ -166,14 +182,12 @@ const Contact = () => {
                     phone: FaPhone, 
                     carType: FaCar 
                   };
-
                   const placeholders = { 
                     name: 'Full Name', 
                     email: 'Email Address', 
                     phone: 'Phone Number', 
                     carType: 'Select Car Type' 
                   };
-
                   return (
                     <div key={field} className={styles.inputContainer}>
                       <div className={styles.inputIcon}>
@@ -258,7 +272,6 @@ const Contact = () => {
         </div>
       </div>
 
-       {/* Fade-in Animation */}
       <style>{`
         @keyframes fadeIn { 
           from { opacity:0; transform:translateY(10px);} 
@@ -270,4 +283,4 @@ const Contact = () => {
   )
 }
 
-export default Contact
+export default Contact;

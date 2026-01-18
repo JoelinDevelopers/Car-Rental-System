@@ -5,7 +5,7 @@ const testimonials = [
     name: "Gloria Onyancha",
     role: "Happy Client",
     comment:
-      "Aurum Drive offers the best experiences and deals you can ever find in Nairobi and within Kenya. I would choose Nova Drive any time, any day!",
+      "Aurum Drive offers the best experiences and deals you can ever find in Nairobi and within Kenya. I would choose Aurum Drive any time, any day!",
     rating: 5,
     car: "Mazda CX5",
   },
@@ -23,7 +23,7 @@ const testimonials = [
     name: "Noah Siokan",
     role: "Happy Client",
     comment:
-      "They offer the best car hire services around. If you are looking for trusted Guys then NovaDrive is the real deal.",
+      "They offer the best car hire services around. If you are looking for trusted Guys then Aurum Drive is the real deal.",
     rating: 5,
     car: "Subaru Forester",
   },
