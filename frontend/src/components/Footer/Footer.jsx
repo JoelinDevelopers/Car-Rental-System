@@ -104,7 +104,7 @@ const Footer = () => {
                             </li>
                             <li className={styles.contactItem}>
                                 <FaPhone className={styles.contactIcon} />
-                                <span>+254 798 615674 </span>
+                                <span>+254 111 260565 </span>
                             </li>
                             <li className={styles.contactItem}>
                                 <FaEnvelope className={styles.contactIcon} />

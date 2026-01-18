@@ -2,30 +2,30 @@
 const testimonials = [
   {
     id: 1,
-    name: "Sarah Johnson",
-    role: "Business Traveler",
+    name: "Gloria Onyancha",
+    role: "Happy Client",
     comment:
-      "The BMW 5 Series was impeccable! Smooth ride and excellent service with ample space. Will definitely rent again.",
+      "Aurum Drive offers the best experiences and deals you can ever find in Nairobi and within Kenya. I would choose Nova Drive any time, any day!",
     rating: 5,
-    car: "BMW 5 Series",
+    car: "Mazda CX5",
   },
   {
     id: 2,
-    name: "Michael Chen",
-    role: "Family Vacation",
+    name: "Vincent Kioko",
+    role: "Happy Client",
     comment:
-      "Perfect family Toyota Highlander with ample space. Clean, well-maintained, and great value for money.",
-    rating: 4,
-    car: "Toyota Highlander",
+      "I will never forget the service offered for my Ruracio and wedding. On time, efficient, new cars, on time service when needed and convenience. A go to car hire company.",
+    rating: 5,
+    car: "Wedding fleet",
   },
   {
     id: 3,
-    name: "Emma Rodriguez",
-    role: "Road Trip Enthusiast",
+    name: "Noah Siokan",
+    role: "Happy Client",
     comment:
-      "Convertible Ford Mustang made our coastal drive unforgettable! 24/7 support was a lifesaver and value for money. .",
+      "They offer the best car hire services around. If you are looking for trusted Guys then NovaDrive is the real deal.",
     rating: 5,
-    car: "Ford Mustang ",
+    car: "Subaru Forester",
   },
 ];
 

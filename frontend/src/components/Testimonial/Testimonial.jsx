@@ -1,6 +1,6 @@
 import React from 'react';
 import { testimonialStyles as styles } from '../../assets/dummyStyles';
-import testimonials from "../../assets/Testimonialdata";
+import testimonials from "../../assets/Testimonialdata.js";
 import { FaCar, FaQuoteLeft, FaStar } from 'react-icons/fa';
 import { GiSteeringWheel } from "react-icons/gi";
 const Testimonial = () => {

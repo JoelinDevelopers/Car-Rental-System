@@ -4,15 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Users, Fuel, Gauge, CheckCircle, Zap } from "lucide-react";
 import axios from "axios";
 import { homeCarsStyles as styles } from "../../assets/dummyStyles";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const startOfDay = (d) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
-const daysBetween = (from, to) =>
-  Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
+import { testimonialStyles as style } from '../../assets/dummyStyles';
 
 const HomeCars = () => {
   const navigate = useNavigate();
@@ -31,7 +23,7 @@ const HomeCars = () => {
   });
   const limit = 6;
   const fallbackImage = `${base}/uploads/default-car.png`;
-  
+
   // Reliable SVG fallback that always works (no external dependency)
   const ultimateFallback = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250'%3E%3Crect width='400' height='250' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui, sans-serif' font-size='18' fill='%23999'%3ENo Image Available%3C/text%3E%3C/svg%3E";
 
@@ -42,7 +34,7 @@ const HomeCars = () => {
       clearTimeout(t);
       try {
         abortRef.current?.abort();
-      } catch {}
+      } catch { }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -52,7 +44,7 @@ const HomeCars = () => {
     setError("");
     try {
       abortRef.current?.abort();
-    } catch {}
+    } catch { }
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
@@ -91,12 +83,12 @@ const HomeCars = () => {
   const handleImageError = (e) => {
     const img = e?.target;
     if (!img) return;
-    
+
     // Prevent infinite error loops
     if (img.src === ultimateFallback) return;
-    
+
     img.onerror = null; // Remove handler to prevent recursion
-    
+
     // Try local fallback first, then ultimate SVG fallback
     if (img.src !== fallbackImage) {
       img.src = fallbackImage;
@@ -107,191 +99,12 @@ const HomeCars = () => {
     } else {
       img.src = ultimateFallback;
     }
-    
+
     img.alt = img.alt || "Image not available";
     img.style.objectFit = img.style.objectFit || "cover";
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "—";
-    try {
-      const d = new Date(dateStr);
-      const now = new Date();
-      const opts =
-        d.getFullYear() === now.getFullYear()
-          ? { day: "numeric", month: "short" }
-          : { day: "numeric", month: "short", year: "numeric" };
-      return new Intl.DateTimeFormat("en-IN", opts).format(d);
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const plural = (n, singular, pluralForm) =>
-    n === 1 ? `1 ${singular}` : `${n} ${pluralForm ?? singular + "s"}`;
-
-  const computeEffectiveAvailability = (car) => {
-    const today = new Date();
-
-    if (Array.isArray(car.bookings) && car.bookings.length) {
-      const overlapping = car.bookings
-        .map((b) => {
-          const pickup = b.pickupDate ?? b.startDate ?? b.start ?? b.from;
-          const ret = b.returnDate ?? b.endDate ?? b.end ?? b.to;
-          if (!pickup || !ret) return null;
-          return { pickup: new Date(pickup), return: new Date(ret), raw: b };
-        })
-        .filter(Boolean)
-        .filter(
-          (b) =>
-            startOfDay(b.pickup) <= startOfDay(today) &&
-            startOfDay(today) <= startOfDay(b.return)
-        );
-
-      if (overlapping.length) {
-        overlapping.sort((a, b) => b.return - a.return);
-        return {
-          state: "booked",
-          until: overlapping[0].return.toISOString(),
-          source: "bookings",
-        };
-      }
-    }
-
-    if (car.availability) {
-      if (car.availability.state === "booked" && car.availability.until) {
-        return {
-          state: "booked",
-          until: car.availability.until,
-          source: "availability",
-        };
-      }
-      if (
-        car.availability.state === "available_until_reservation" &&
-        Number(car.availability.daysAvailable ?? -1) === 0
-      ) {
-        return {
-          state: "booked",
-          until: car.availability.until ?? null,
-          source: "availability-res-starts-today",
-          nextBookingStarts: car.availability.nextBookingStarts,
-        };
-      }
-      return { ...car.availability, source: "availability" };
-    }
-
-    return { state: "fully_available", source: "none" };
-  };
-
-  const computeAvailableMeta = (untilIso) => {
-    if (!untilIso) return null;
-    try {
-      const until = new Date(untilIso);
-      const available = new Date(until);
-      available.setDate(available.getDate() + 1);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return {
-        availableIso: available.toISOString(),
-        daysUntilAvailable: daysBetween(today, available),
-      };
-    } catch {
-      return null;
-    }
-  };
-
-  const renderAvailabilityBadge = (rawAvailability, car) => {
-    const effective = computeEffectiveAvailability(car);
-    if (!effective)
-      return (
-        <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
-          Available
-        </span>
-      );
-
-    if (effective.state === "booked") {
-      if (effective.until) {
-        const meta = computeAvailableMeta(effective.until);
-        if (meta?.availableIso) {
-          return (
-            <div className="flex flex-col items-end">
-              <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-                Booked — available on {formatDate(meta.availableIso)}
-              </span>
-              <small className="text-xs text-gray-400 mt-1">
-                until {formatDate(effective.until)}
-              </small>
-            </div>
-          );
-        }
-        return (
-          <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-              Booked
-            </span>
-            {effective.until && (
-              <small className="text-xs text-gray-400 mt-1">
-                until {formatDate(effective.until)}
-              </small>
-            )}
-          </div>
-        );
-      }
-      return (
-        <div className="flex flex-col items-end">
-          <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-            Booked
-          </span>
-        </div>
-      );
-    }
-
-    if (effective.state === "available_until_reservation") {
-      const days = Number(effective.daysAvailable ?? -1);
-      if (!Number.isFinite(days) || days < 0) {
-        return (
-          <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-amber-50 text-amber-800 font-semibold">
-              Available
-            </span>
-            {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">
-                from {formatDate(effective.nextBookingStarts)}
-              </small>
-            )}
-          </div>
-        );
-      }
-      return (
-        <div className="flex flex-col items-end">
-          <span className="px-2 py-1 text-xs rounded-md bg-amber-50 text-amber-800 font-semibold">
-            Available — reserved in {plural(days, "day")}
-          </span>
-          {effective.nextBookingStarts && (
-            <small className="text-xs text-gray-400 mt-1">
-              from {formatDate(effective.nextBookingStarts)}
-            </small>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
-        Available
-      </span>
-    );
-  };
-
-  const isBookDisabled = (car) => {
-    const effective = computeEffectiveAvailability(car);
-    if (car?.status && car.status !== "available") return true;
-    if (!effective) return false;
-    return effective.state === "booked";
-  };
-
   const handleBook = (car) => {
-    if (isBookDisabled(car)) return;
     navigate(`/cars/${car._id || car.id}`, { state: { car } });
   };
 
@@ -318,11 +131,10 @@ const HomeCars = () => {
           Array.from({ length: limit }).map((_, idx) => (
             <div
               key={`s-${idx}`}
-              className={`${styles.card} border ${
-                styles.borderGradients?.[
-                  idx % (styles.borderGradients?.length || 1)
+              className={`${styles.card} border ${styles.borderGradients?.[
+                idx % (styles.borderGradients?.length || 1)
                 ] || ""
-              } opacity-50 animate-pulse`}
+                } opacity-50 animate-pulse`}
               style={{
                 clipPath:
                   "polygon(0% 15%, 15% 0%, 100% 0%, 100% 85%, 85% 100%, 0% 100%)",
@@ -373,7 +185,6 @@ const HomeCars = () => {
             const initialTranslateY = "40px";
             const transformWhenHovered =
               hoveredCard === (car._id || car.id) ? "rotate(0.5deg)" : "none";
-            const disabled = isBookDisabled(car);
 
             return (
               <div
@@ -402,7 +213,9 @@ const HomeCars = () => {
                 </div>
 
                 <div className="absolute right-4 top-4 z-20">
-                  {renderAvailabilityBadge(car.availability, car)}
+                  <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
+                    Available
+                  </span>
                 </div>
 
                 <div className={styles.imageContainer}>
@@ -474,21 +287,11 @@ const HomeCars = () => {
 
                   <button
                     onClick={() => handleBook(car)}
-                    className={`${styles.bookButton} ${
-                      disabled
-                        ? "opacity-60 cursor-not-allowed"
-                        : "hover:shadow-md"
-                    }`}
-                    disabled={disabled}
-                    aria-disabled={disabled}
-                    title={
-                      disabled
-                        ? "This car is currently booked or unavailable"
-                        : "Book this car"
-                    }
+                    className={`${styles.bookButton} hover:shadow-md`}
+                    title="Book this car"
                   >
                     <span className={styles.buttonText}>
-                      {disabled ? "Unavailable" : "Book Now"}
+                      Book Now
                       <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </span>
                   </button>
@@ -498,6 +301,12 @@ const HomeCars = () => {
               </div>
             );
           })}
+      </div>
+
+      <div className={style.ctaContainer}>
+        <a href="/cars" className={style.ctaButton}>
+          View Entire Fleet
+        </a>
       </div>
     </div>
   );
