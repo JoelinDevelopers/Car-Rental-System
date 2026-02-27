@@ -68,6 +68,149 @@ const calculateDays = (from, to) => {
     return Math.max(1, days);
 };
 
+// ✅ Success Popup Component
+const SuccessPopup = ({ visible }) => {
+    if (!visible) return null;
+    return (
+        <>
+            <style>{`
+                @keyframes successFadeIn {
+                    from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+                    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                }
+                @keyframes successFadeOut {
+                    from { opacity: 1; }
+                    to   { opacity: 0; }
+                }
+                @keyframes checkPop {
+                    0%   { transform: scale(0) rotate(-15deg); }
+                    60%  { transform: scale(1.2) rotate(5deg); }
+                    100% { transform: scale(1) rotate(0deg); }
+                }
+                @keyframes ringPulse {
+                    0%   { transform: scale(1); opacity: 0.6; }
+                    100% { transform: scale(1.7); opacity: 0; }
+                }
+                @keyframes barFill {
+                    from { width: 100%; }
+                    to   { width: 0%; }
+                }
+                .success-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0,0,0,0.65);
+                    backdrop-filter: blur(4px);
+                    z-index: 9998;
+                }
+                .success-card {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 9999;
+                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                    border: 1px solid rgba(251,146,60,0.3);
+                    border-radius: 24px;
+                    padding: 48px 40px 36px;
+                    width: 360px;
+                    max-width: 90vw;
+                    text-align: center;
+                    animation: successFadeIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) forwards;
+                    box-shadow: 0 25px 60px rgba(0,0,0,0.6), 0 0 80px rgba(251,146,60,0.08);
+                }
+                .check-ring {
+                    width: 88px;
+                    height: 88px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, #f97316, #fb923c);
+                    margin: 0 auto 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                    animation: checkPop 0.5s 0.2s cubic-bezier(0.175,0.885,0.32,1.275) both;
+                    box-shadow: 0 0 30px rgba(249,115,22,0.5);
+                }
+                .check-ring::after {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    border-radius: 50%;
+                    border: 3px solid rgba(249,115,22,0.6);
+                    animation: ringPulse 1.2s 0.5s ease-out infinite;
+                }
+                .check-icon {
+                    font-size: 38px;
+                    color: #fff;
+                }
+                .success-title {
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #fff;
+                    margin-bottom: 10px;
+                    letter-spacing: -0.3px;
+                }
+                .success-message {
+                    font-size: 14px;
+                    color: rgba(255,255,255,0.65);
+                    line-height: 1.6;
+                    margin-bottom: 28px;
+                }
+                .success-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: rgba(249,115,22,0.12);
+                    border: 1px solid rgba(249,115,22,0.3);
+                    color: #fb923c;
+                    font-size: 12px;
+                    font-weight: 600;
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    margin-bottom: 24px;
+                }
+                .progress-bar-track {
+                    width: 100%;
+                    height: 3px;
+                    background: rgba(255,255,255,0.08);
+                    border-radius: 2px;
+                    overflow: hidden;
+                    margin-top: 4px;
+                }
+                .progress-bar-fill {
+                    height: 100%;
+                    background: linear-gradient(90deg, #f97316, #fb923c);
+                    border-radius: 2px;
+                    animation: barFill 3s linear forwards;
+                }
+                .redirect-note {
+                    font-size: 11px;
+                    color: rgba(255,255,255,0.35);
+                    margin-top: 10px;
+                }
+            `}</style>
+            <div className="success-overlay" />
+            <div className="success-card">
+                <div className="check-ring">
+                    <span className="check-icon">✓</span>
+                </div>
+                <div className="success-title">Booking Confirmed!</div>
+                <div className="success-message">
+                    Your reservation has been received successfully.<br />
+                    Our team will get back to you shortly to confirm the details.
+                </div>
+                <div className="success-badge">
+                    <span>📋</span> Booking Submitted
+                </div>
+                <div className="progress-bar-track">
+                    <div className="progress-bar-fill" />
+                </div>
+                <div className="redirect-note">Redirecting to My Bookings…</div>
+            </div>
+        </>
+    );
+};
+
 const CarDetail = () => {
     const { id } = useParams();
     const location = useLocation();
@@ -94,7 +237,8 @@ const CarDetail = () => {
     });
     const [activeField, setActiveField] = useState(null);
     const [submitting, setSubmitting] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false); // ✅ NEW: Prevent double submission
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [showSuccessPopup, setShowSuccessPopup] = useState(false); // ✅ NEW
     const fetchControllerRef = useRef(null);
     const submitControllerRef = useRef(null);
     const [today, setToday] = useState(todayISO());
@@ -198,7 +342,6 @@ const CarDetail = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        // ✅ PREVENT DOUBLE SUBMISSION
         if (isProcessing || submitting) {
             console.log('⚠️ Submission already in progress, ignoring...');
             return;
@@ -208,16 +351,15 @@ const CarDetail = () => {
             toast.error("Please select pickup and return dates.");
             return;
         }
-        
+
         const pickupDateObj = new Date(formData.pickupDate);
         const returnDateObj = new Date(formData.returnDate);
-        
+
         if (returnDateObj < pickupDateObj) {
             toast.error("Return date must be the same or after pickup date.");
             return;
         }
 
-        // ✅ MINIMUM 3 DAYS VALIDATION
         const daysDiff = calculateDays(formData.pickupDate, formData.returnDate);
         if (daysDiff < 3) {
             toast.error("Minimum booking period is 3 days.");
@@ -233,20 +375,15 @@ const CarDetail = () => {
             return;
         }
 
-        // ✅ SET BOTH FLAGS TO PREVENT DOUBLE SUBMISSION
         setSubmitting(true);
         setIsProcessing(true);
 
-        // ✅ ABORT PREVIOUS REQUEST IF EXISTS
         if (submitControllerRef.current) {
             try {
                 submitControllerRef.current.abort();
-                console.log('🛑 Aborted previous request');
-            } catch (err) {
-                console.log('Previous controller already aborted');
-            }
+            } catch (err) { }
         }
-        
+
         const controller = new AbortController();
         submitControllerRef.current = controller;
 
@@ -262,8 +399,10 @@ const CarDetail = () => {
             formDataToSend.append('email', formData.email);
             formDataToSend.append('phone', formData.phone);
 
+            // ✅ FIX: Resolve car ID — prefer _id (MongoDB ObjectId), fall back to id
+            const carId = car._id?.toString?.() || car.id?.toString?.() || null;
             const carData = {
-                id: car._id ?? car.id ?? null,
+                id: carId,
                 make: car.make || '',
                 model: car.model || '',
                 year: car.year || null,
@@ -298,72 +437,16 @@ const CarDetail = () => {
             formDataToSend.append('idPhoto', formData.idPassportImage);
             formDataToSend.append('licensePhoto', formData.drivingLicenseImage);
 
-            const headers = {
-                'Content-Type': 'multipart/form-data',
-            };
+            const headers = { 'Content-Type': 'multipart/form-data' };
             if (token) headers.Authorization = `Bearer ${token}`;
 
-            console.log('📤 Submitting booking with documents...');
+            await api.post('/api/bookings', formDataToSend, {
+                headers,
+                signal: controller.signal,
+            });
 
-            const bookingRes = await api.post(
-                '/api/bookings',
-                formDataToSend,
-                {
-                    headers,
-                    signal: controller.signal,
-                }
-            );
-
-            console.log('✅ Booking created:', bookingRes.data);
-
-            const paymentPayload = {
-                userId,
-                customer: formData.name,
-                email: formData.email,
-                phone: formData.phone,
-                car: carData,
-                pickupDate: formData.pickupDate,
-                returnDate: formData.returnDate,
-                amount: calculateTotal(),
-                details,
-                address,
-                carImage: carImageUrl,
-                bookingId: bookingRes.data?.booking?._id || bookingRes.data?._id,
-            };
-
-            const paymentHeaders = {
-                'Content-Type': 'application/json',
-                ...(token && { Authorization: `Bearer ${token}` })
-            };
-
-            const paymentRes = await api.post(
-                '/api/payments/create-checkout-session',
-                paymentPayload,
-                {
-                    headers: paymentHeaders,
-                    signal: controller.signal,
-                }
-            );
-
-            if (paymentRes?.data?.url) {
-                toast.success("Redirecting to payment...", {
-                    position: "top-right",
-                    autoClose: 1200,
-                });
-                
-                // ✅ CLEAR CONTROLLER BEFORE REDIRECT
-                submitControllerRef.current = null;
-                
-                setTimeout(() => {
-                    window.location.href = paymentRes.data.url;
-                }, 1200);
-                return;
-            }
-
-            toast.success(
-                "Booking created successfully! Please complete payment from bookings page.",
-                { position: "top-right", autoClose: 2000 }
-            );
+            // ✅ SHOW SUCCESS POPUP & REDIRECT AFTER 3s
+            setShowSuccessPopup(true);
 
             setFormData({
                 pickupDate: "",
@@ -382,20 +465,29 @@ const CarDetail = () => {
             });
 
             setTimeout(() => {
+                setShowSuccessPopup(false);
                 navigate("/bookings");
-            }, 2000);
+            }, 3200);
 
         } catch (err) {
             const canceled =
                 err?.code === "ERR_CANCELED" ||
                 err?.name === "CanceledError" ||
                 err?.message === "canceled";
-            if (canceled) {
-                console.log('Request was cancelled');
-                return;
-            }
+            if (canceled) return;
 
             console.error("Booking error:", err);
+            console.error("🔴 SERVER RESPONSE DATA:", JSON.stringify(err?.response?.data, null, 2));
+            console.error("🔴 STATUS:", err?.response?.status);
+            console.error("🔴 BODY SENT:", {
+                customer: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+                carId: car._id?.toString?.() || car.id?.toString?.() || "NO ID FOUND",
+                pickupDate: formData.pickupDate,
+                returnDate: formData.returnDate,
+                userId: JSON.parse(localStorage.getItem("user") || "{}")?.id || "NO USER",
+            });
             const serverMessage =
                 err?.response?.data?.message ||
                 err?.response?.data?.error ||
@@ -403,7 +495,6 @@ const CarDetail = () => {
                 "Booking failed";
             toast.error(String(serverMessage));
         } finally {
-            // ✅ RESET FLAGS ONLY IF NOT REDIRECTING
             setSubmitting(false);
             setIsProcessing(false);
             submitControllerRef.current = null;
@@ -416,6 +507,9 @@ const CarDetail = () => {
 
     return (
         <div className={carDetailStyles.pageContainer}>
+            {/* ✅ SUCCESS POPUP */}
+            <SuccessPopup visible={showSuccessPopup} />
+
             <div className={carDetailStyles.contentContainer}>
                 <ToastContainer />
                 <button
@@ -518,27 +612,19 @@ const CarDetail = () => {
                             <div className="mt-4 grid grid-cols-2 gap-3">
                                 <div className="flex items-center">
                                     <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                                    <span className="text-gray-300 text-sm">
-                                        Free cancellation
-                                    </span>
+                                    <span className="text-gray-300 text-sm">Free cancellation</span>
                                 </div>
                                 <div className="flex items-center">
                                     <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                                    <span className="text-gray-300 text-sm">
-                                        24/7 Roadside assistance
-                                    </span>
+                                    <span className="text-gray-300 text-sm">24/7 Roadside assistance</span>
                                 </div>
                                 <div className="flex items-center">
                                     <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                                    <span className="text-gray-300 text-sm">
-                                        Unlimited mileage
-                                    </span>
+                                    <span className="text-gray-300 text-sm">Unlimited mileage</span>
                                 </div>
                                 <div className="flex items-center">
                                     <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                                    <span className="text-gray-300 text-sm">
-                                        Collision damage waiver
-                                    </span>
+                                    <span className="text-gray-300 text-sm">Collision damage waiver</span>
                                 </div>
                             </div>
                         </div>
@@ -619,7 +705,6 @@ const CarDetail = () => {
                                     </div>
                                 </div>
 
-                                {/* Show days warning if less than 3 */}
                                 {formData.pickupDate && formData.returnDate && days < 3 && (
                                     <div className="text-yellow-400 text-sm mt-2 px-3 py-2 bg-yellow-900/20 rounded-lg border border-yellow-400/30">
                                         ⚠️ Minimum booking period is 3 days. Currently selected: {days} day{days !== 1 ? 's' : ''}
@@ -954,4 +1039,4 @@ const CarDetail = () => {
     );
 };
 
-export default CarDetail
+export default CarDetail;
